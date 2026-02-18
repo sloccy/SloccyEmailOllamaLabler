@@ -10,7 +10,7 @@ services:
       - internal
 
   app:
-    build: .
+    build: ghcr.io/sloccy/sloccyemailollamalabeler:latest
     container_name: gmail-labeler-app
     ports:
       - "5000:5000"
