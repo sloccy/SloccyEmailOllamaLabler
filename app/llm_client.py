@@ -45,7 +45,7 @@ Reply with only one word: YES or NO."""
             "stream": False,
             "options": {"temperature": 0, "num_predict": 5},
         },
-        timeout=120,
+        timeout=600,
     )
     response.raise_for_status()
     answer = response.json().get("response", "").strip().upper()

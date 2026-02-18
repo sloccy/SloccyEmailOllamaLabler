@@ -72,7 +72,7 @@ def get_or_create_label(service, label_name: str) -> str:
     return created["id"]
 
 
-def fetch_recent_emails(service, max_results=50):
+def fetch_recent_emails(service, max_results=5):
     response = service.users().messages().list(
         userId="me", maxResults=max_results
     ).execute()
