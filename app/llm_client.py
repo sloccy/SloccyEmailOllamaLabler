@@ -6,7 +6,6 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
 
 
 def ensure_model_pulled():
-    """Pull the model if it isn't already available. Called once at startup."""
     try:
         resp = requests.get(f"{OLLAMA_HOST}/api/tags", timeout=10)
         models = [m["name"] for m in resp.json().get("models", [])]
@@ -25,7 +24,6 @@ def ensure_model_pulled():
 
 
 def should_apply_label(email: dict, instructions: str) -> bool:
-    """Ask the LLM whether to apply a label. Returns True for YES."""
     prompt = f"""You are an email classification assistant. Your only job is to decide whether to apply a label to an email based on a rule.
 
 Rule: {instructions}
@@ -45,10 +43,7 @@ Reply with only one word: YES or NO."""
             "model": OLLAMA_MODEL,
             "prompt": prompt,
             "stream": False,
-            "options": {
-                "temperature": 0,
-                "num_predict": 5,
-            },
+            "options": {"temperature": 0, "num_predict": 5},
         },
         timeout=120,
     )

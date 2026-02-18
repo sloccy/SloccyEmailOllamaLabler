@@ -1,7 +1,6 @@
 import sqlite3
 import os
 from contextlib import contextmanager
-from datetime import datetime
 
 DB_PATH = os.path.join(os.getenv("DATA_DIR", "/data"), "labeler.db")
 
@@ -65,36 +64,31 @@ def init_db():
         """)
 
 
-# --- Settings ---
-
-def get_setting(key: str, default=None):
+def get_setting(key, default=None):
     with get_db() as conn:
         row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
     return row["value"] if row else default
 
 
-def set_setting(key: str, value: str):
+def set_setting(key, value):
     with get_db() as conn:
         conn.execute(
-            "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-            (key, value),
+            "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value)
         )
 
-
-# --- Accounts ---
 
 def list_accounts():
     with get_db() as conn:
         return [dict(r) for r in conn.execute("SELECT * FROM accounts ORDER BY added_at DESC").fetchall()]
 
 
-def get_account(account_id: int):
+def get_account(account_id):
     with get_db() as conn:
         row = conn.execute("SELECT * FROM accounts WHERE id = ?", (account_id,)).fetchone()
     return dict(row) if row else None
 
 
-def upsert_account(email: str, credentials_json: str):
+def upsert_account(email, credentials_json):
     with get_db() as conn:
         conn.execute(
             """INSERT INTO accounts (email, credentials_json)
@@ -104,7 +98,7 @@ def upsert_account(email: str, credentials_json: str):
         )
 
 
-def update_account_credentials(account_id: int, credentials_json: str):
+def update_account_credentials(account_id, credentials_json):
     with get_db() as conn:
         conn.execute(
             "UPDATE accounts SET credentials_json = ? WHERE id = ?",
@@ -112,28 +106,25 @@ def update_account_credentials(account_id: int, credentials_json: str):
         )
 
 
-def update_last_scan(account_id: int):
+def update_last_scan(account_id):
     with get_db() as conn:
         conn.execute(
-            "UPDATE accounts SET last_scan_at = datetime('now') WHERE id = ?",
-            (account_id,),
+            "UPDATE accounts SET last_scan_at = datetime('now') WHERE id = ?", (account_id,)
         )
 
 
-def delete_account(account_id: int):
+def delete_account(account_id):
     with get_db() as conn:
         conn.execute("DELETE FROM accounts WHERE id = ?", (account_id,))
         conn.execute("DELETE FROM processed_emails WHERE account_id = ?", (account_id,))
 
-
-# --- Prompts ---
 
 def list_prompts():
     with get_db() as conn:
         return [dict(r) for r in conn.execute("SELECT * FROM prompts ORDER BY created_at DESC").fetchall()]
 
 
-def create_prompt(name: str, instructions: str, label_name: str):
+def create_prompt(name, instructions, label_name):
     with get_db() as conn:
         conn.execute(
             "INSERT INTO prompts (name, instructions, label_name) VALUES (?, ?, ?)",
@@ -141,7 +132,7 @@ def create_prompt(name: str, instructions: str, label_name: str):
         )
 
 
-def update_prompt(prompt_id: int, name: str, instructions: str, label_name: str, active: int):
+def update_prompt(prompt_id, name, instructions, label_name, active):
     with get_db() as conn:
         conn.execute(
             "UPDATE prompts SET name=?, instructions=?, label_name=?, active=? WHERE id=?",
@@ -149,14 +140,12 @@ def update_prompt(prompt_id: int, name: str, instructions: str, label_name: str,
         )
 
 
-def delete_prompt(prompt_id: int):
+def delete_prompt(prompt_id):
     with get_db() as conn:
         conn.execute("DELETE FROM prompts WHERE id = ?", (prompt_id,))
 
 
-# --- Processed emails ---
-
-def is_processed(account_id: int, message_id: str) -> bool:
+def is_processed(account_id, message_id):
     with get_db() as conn:
         row = conn.execute(
             "SELECT 1 FROM processed_emails WHERE account_id=? AND message_id=?",
@@ -165,7 +154,7 @@ def is_processed(account_id: int, message_id: str) -> bool:
     return row is not None
 
 
-def mark_processed(account_id: int, message_id: str):
+def mark_processed(account_id, message_id):
     with get_db() as conn:
         conn.execute(
             "INSERT OR IGNORE INTO processed_emails (account_id, message_id) VALUES (?, ?)",
@@ -173,22 +162,18 @@ def mark_processed(account_id: int, message_id: str):
         )
 
 
-# --- Logs ---
-
-def add_log(level: str, message: str):
+def add_log(level, message):
     with get_db() as conn:
         conn.execute(
-            "INSERT INTO logs (level, message) VALUES (?, ?)",
-            (level.upper(), message),
+            "INSERT INTO logs (level, message) VALUES (?, ?)", (level.upper(), message)
         )
-    # Trim to last 500 entries
     with get_db() as conn:
         conn.execute(
             "DELETE FROM logs WHERE id NOT IN (SELECT id FROM logs ORDER BY id DESC LIMIT 500)"
         )
 
 
-def get_logs(limit: int = 100):
+def get_logs(limit=100):
     with get_db() as conn:
         return [dict(r) for r in conn.execute(
             "SELECT * FROM logs ORDER BY id DESC LIMIT ?", (limit,)

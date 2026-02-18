@@ -25,7 +25,6 @@ def stop():
 
 
 def run_now():
-    """Trigger an immediate scan in a separate thread (non-blocking)."""
     threading.Thread(target=_scan_all_accounts, daemon=True).start()
 
 
@@ -40,22 +39,20 @@ def _loop():
 
 
 def _scan_all_accounts():
-    import time as t
-    _status["last_run"] = t.time()
-    accounts = db.list_accounts()
-    active_accounts = [a for a in accounts if a["active"]]
+    _status["last_run"] = time.time()
+    accounts = [a for a in db.list_accounts() if a["active"]]
     prompts = [p for p in db.list_prompts() if p["active"]]
 
-    if not active_accounts:
+    if not accounts:
         db.add_log("INFO", "Poller ran: no active accounts configured.")
         return
     if not prompts:
         db.add_log("INFO", "Poller ran: no active prompts configured.")
         return
 
-    db.add_log("INFO", f"Starting scan: {len(active_accounts)} account(s), {len(prompts)} prompt(s).")
+    db.add_log("INFO", f"Starting scan: {len(accounts)} account(s), {len(prompts)} prompt(s).")
 
-    for account in active_accounts:
+    for account in accounts:
         _scan_account(account, prompts)
 
 
@@ -64,7 +61,6 @@ def _scan_account(account, prompts):
     email_addr = account["email"]
     try:
         service, refreshed_creds = gmail_client.get_service(account["credentials_json"])
-        # Save refreshed credentials if they changed
         if refreshed_creds != account["credentials_json"]:
             db.update_account_credentials(account_id, refreshed_creds)
 
@@ -78,7 +74,6 @@ def _scan_account(account, prompts):
 
         db.add_log("INFO", f"[{email_addr}] Processing {len(new_emails)} new email(s).")
 
-        # Pre-fetch label IDs for all prompts
         label_cache = {}
         for prompt in prompts:
             if prompt["label_name"] not in label_cache:
@@ -89,17 +84,16 @@ def _scan_account(account, prompts):
         for email in new_emails:
             for prompt in prompts:
                 try:
-                    result = llm_client.should_apply_label(email, prompt["instructions"])
-                    if result:
+                    if llm_client.should_apply_label(email, prompt["instructions"]):
                         gmail_client.apply_label(service, email["id"], label_cache[prompt["label_name"]])
                         db.add_log(
                             "INFO",
-                            f"[{email_addr}] Labeled '{email['subject'][:60]}' → {prompt['label_name']} (prompt: {prompt['name']})",
+                            f"[{email_addr}] Labeled '{email['subject'][:60]}' → {prompt['label_name']} (rule: {prompt['name']})",
                         )
                     else:
                         db.add_log(
                             "DEBUG",
-                            f"[{email_addr}] Skipped '{email['subject'][:60]}' for prompt: {prompt['name']}",
+                            f"[{email_addr}] Skipped '{email['subject'][:60]}' for rule: {prompt['name']}",
                         )
                 except Exception as e:
                     db.add_log("ERROR", f"[{email_addr}] LLM error on '{email['subject'][:60]}': {e}")

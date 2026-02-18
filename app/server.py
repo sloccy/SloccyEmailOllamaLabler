@@ -1,6 +1,7 @@
 import os
 import secrets
-from flask import Flask, jsonify, request, render_template, redirect, session, url_for
+from urllib.parse import urlparse, parse_qs
+from flask import Flask, jsonify, request, render_template, session
 from app import db, gmail_client, poller, llm_client
 
 app = Flask(__name__, template_folder="templates")
@@ -17,40 +18,59 @@ def index():
 
 
 # ---------------------------------------------------------------------------
-# OAuth flow
+# OAuth - Desktop app flow (no redirect URI registration needed)
 # ---------------------------------------------------------------------------
 
-@app.route("/oauth/start")
+@app.route("/api/oauth/start", methods=["POST"])
 def oauth_start():
+    """Generate and return the Google auth URL for the user to open manually."""
     state = secrets.token_urlsafe(16)
     session["oauth_state"] = state
     try:
         auth_url = gmail_client.get_auth_url(state)
-        return redirect(auth_url)
+        return jsonify({"auth_url": auth_url, "state": state})
     except FileNotFoundError:
-        return jsonify({"error": "credentials.json not found. Please place your Google OAuth credentials file at /credentials/credentials.json"}), 500
+        return jsonify({"error": "credentials.json not found. Place your Google OAuth credentials file at /credentials/credentials.json inside the container (./credentials/ on the host)."}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
-@app.route("/oauth/callback")
-def oauth_callback():
-    state = request.args.get("state")
-    code = request.args.get("code")
-    error = request.args.get("error")
+@app.route("/api/oauth/exchange", methods=["POST"])
+def oauth_exchange():
+    """
+    Accept the full redirect URL that the user copied from their browser
+    after approving access. Extract the code and exchange it for tokens.
+    """
+    data = request.json
+    pasted_url = data.get("url", "").strip()
 
-    if error:
-        return render_template("index.html", oauth_error=error)
+    if not pasted_url:
+        return jsonify({"error": "No URL provided."}), 400
 
-    if state != session.get("oauth_state"):
-        return render_template("index.html", oauth_error="Invalid OAuth state. Please try again.")
+    # Parse the code and state out of the pasted URL
+    try:
+        parsed = urlparse(pasted_url)
+        params = parse_qs(parsed.query)
+        code = params.get("code", [None])[0]
+        state = params.get("state", [None])[0]
+    except Exception:
+        return jsonify({"error": "Could not parse the URL. Make sure you copied the full URL from your browser's address bar."}), 400
+
+    if not code:
+        return jsonify({"error": "No authorization code found in the URL. Make sure you copied the full URL from your browser's address bar after approving access."}), 400
+
+    expected_state = session.get("oauth_state")
+    if not expected_state or state != expected_state:
+        return jsonify({"error": "State mismatch. Please start the authorization process again."}), 400
 
     try:
         email, credentials_json = gmail_client.exchange_code(state, code)
         db.upsert_account(email, credentials_json)
-        db.add_log("INFO", f"Account added: {email}")
-        return redirect("/?added=1")
+        db.add_log("INFO", f"Account connected: {email}")
+        return jsonify({"ok": True, "email": email})
     except Exception as e:
-        db.add_log("ERROR", f"OAuth callback failed: {e}")
-        return render_template("index.html", oauth_error=str(e))
+        db.add_log("ERROR", f"OAuth exchange failed: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 # ---------------------------------------------------------------------------
@@ -60,7 +80,6 @@ def oauth_callback():
 @app.route("/api/accounts", methods=["GET"])
 def api_list_accounts():
     accounts = db.list_accounts()
-    # Don't send credentials to the frontend
     safe = [{k: v for k, v in a.items() if k != "credentials_json"} for a in accounts]
     return jsonify(safe)
 
@@ -147,7 +166,7 @@ def api_update_settings():
 
 
 # ---------------------------------------------------------------------------
-# Logs + Status API
+# Logs + Status
 # ---------------------------------------------------------------------------
 
 @app.route("/api/logs", methods=["GET"])
@@ -159,11 +178,7 @@ def api_get_logs():
 @app.route("/api/status", methods=["GET"])
 def api_status():
     import time
-    status = poller.get_status()
-    return jsonify({
-        **status,
-        "current_time": time.time(),
-    })
+    return jsonify({**poller.get_status(), "current_time": time.time()})
 
 
 @app.route("/api/scan", methods=["POST"])
@@ -179,7 +194,6 @@ def api_scan_now():
 
 def create_app():
     db.init_db()
-    # Pull model in background so startup is fast
     import threading
     threading.Thread(target=llm_client.ensure_model_pulled, daemon=True).start()
     poller.start()

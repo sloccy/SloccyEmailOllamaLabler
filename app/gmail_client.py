@@ -9,6 +9,8 @@ from googleapiclient.discovery import build
 SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
 CREDENTIALS_FILE = os.getenv("CREDENTIALS_FILE", "/credentials/credentials.json")
 
+# Desktop app flow uses this fixed loopback redirect.
+# Google permits this for Desktop app OAuth clients without registering it.
 REDIRECT_URI = "http://localhost"
 
 
@@ -24,6 +26,10 @@ def get_auth_url(state: str) -> str:
 
 
 def exchange_code(state: str, code: str) -> tuple[str, str]:
+    """
+    Exchange the authorization code for credentials.
+    Returns (email, credentials_json).
+    """
     flow = Flow.from_client_secrets_file(CREDENTIALS_FILE, scopes=SCOPES, state=state)
     flow.redirect_uri = REDIRECT_URI
     flow.fetch_token(code=code)
@@ -39,6 +45,7 @@ def _get_email(creds: Credentials) -> str:
 
 
 def get_service(credentials_json: str):
+    """Build a Gmail service, refreshing credentials if expired."""
     creds = Credentials.from_authorized_user_info(json.loads(credentials_json), SCOPES)
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
@@ -52,17 +59,25 @@ def get_or_create_label(service, label_name: str) -> str:
             return label["id"]
     created = service.users().labels().create(
         userId="me",
-        body={"name": label_name, "labelListVisibility": "labelShow", "messageListVisibility": "show"},
+        body={
+            "name": label_name,
+            "labelListVisibility": "labelShow",
+            "messageListVisibility": "show",
+        },
     ).execute()
     return created["id"]
 
 
 def fetch_recent_emails(service, max_results=50):
-    response = service.users().messages().list(userId="me", maxResults=max_results).execute()
+    response = service.users().messages().list(
+        userId="me", maxResults=max_results
+    ).execute()
     messages = response.get("messages", [])
     emails = []
     for msg in messages:
-        full = service.users().messages().get(userId="me", id=msg["id"], format="full").execute()
+        full = service.users().messages().get(
+            userId="me", id=msg["id"], format="full"
+        ).execute()
         headers = {h["name"]: h["value"] for h in full["payload"]["headers"]}
         body = _extract_body(full["payload"])
         emails.append({
@@ -77,7 +92,9 @@ def fetch_recent_emails(service, max_results=50):
 
 def apply_label(service, message_id: str, label_id: str):
     service.users().messages().modify(
-        userId="me", id=message_id, body={"addLabelIds": [label_id]}
+        userId="me",
+        id=message_id,
+        body={"addLabelIds": [label_id]},
     ).execute()
 
 
