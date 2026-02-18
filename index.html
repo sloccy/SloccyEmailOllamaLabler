@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gmail Labeler</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0c0c0c;
+      --surface:   #131313;
+      --surface2:  #1a1a1a;
+      --border:    #252525;
+      --border2:   #2e2e2e;
+      --text:      #e2e2e2;
+      --muted:     #5a5a5a;
+      --muted2:    #3a3a3a;
+      --amber:     #f59e0b;
+      --amber-dim: #92600a;
+      --green:     #22c55e;
+      --red:       #ef4444;
+      --blue:      #3b82f6;
+      --mono:      'IBM Plex Mono', monospace;
+      --sans:      'DM Sans', sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* ---- Layout ---- */
+    .layout { display: flex; height: 100vh; overflow: hidden; }
+
+    .sidebar {
+      width: 220px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 24px 0;
+    }
+
+    .logo {
+      padding: 0 20px 24px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+    .logo-mark {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--amber);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .logo-title {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+
+    .nav { flex: 1; }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 20px;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 13.5px;
+      font-weight: 500;
+      border-left: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+      user-select: none;
+    }
+    .nav-item:hover { color: var(--text); background: var(--surface2); }
+    .nav-item.active { color: var(--amber); border-left-color: var(--amber); background: rgba(245,158,11,0.06); }
+    .nav-icon { font-size: 15px; width: 18px; text-align: center; }
+
+    .sidebar-footer {
+      padding: 16px 20px 0;
+      border-top: 1px solid var(--border);
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--muted2);
+      transition: background 0.3s;
+    }
+    .status-dot.active { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+    /* ---- Main ---- */
+    .main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+
+    .page { display: none; flex-direction: column; flex: 1; padding: 32px 36px; animation: fadeIn 0.2s ease; }
+    .page.active { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 28px;
+    }
+    .page-title {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .page-sub {
+      font-size: 12.5px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* ---- Buttons ---- */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      text-decoration: none;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--amber); color: #000; }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border2); }
+    .btn-ghost:hover { border-color: var(--muted); }
+    .btn-danger { background: transparent; color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+    .btn-danger:hover { background: rgba(239,68,68,0.08); }
+    .btn-sm { padding: 5px 11px; font-size: 12px; }
+
+    /* ---- Cards ---- */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 22px;
+      margin-bottom: 12px;
+    }
+    .card-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .card-title {
+      font-weight: 600;
+      font-size: 14.5px;
+      margin-bottom: 3px;
+    }
+    .card-meta {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .card-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      font-family: var(--mono);
+    }
+    .badge-green { background: rgba(34,197,94,0.12); color: var(--green); }
+    .badge-muted { background: var(--surface2); color: var(--muted); }
+    .badge-amber { background: rgba(245,158,11,0.12); color: var(--amber); }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 4px;
+      font-size: 11.5px;
+      font-family: var(--mono);
+      background: rgba(245,158,11,0.1);
+      color: var(--amber);
+      border: 1px solid rgba(245,158,11,0.2);
+    }
+
+    /* ---- Forms ---- */
+    .form-section { margin-bottom: 28px; }
+    .form-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .form-group { margin-bottom: 14px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    label {
+      display: block;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    input[type="text"], input[type="number"], textarea, select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 13.5px;
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--amber);
+    }
+    textarea { resize: vertical; min-height: 80px; }
+    .form-hint { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+
+    /* ---- Panel (add form) ---- */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 22px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .panel.open { display: block; animation: fadeIn 0.2s ease; }
+    .panel-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      margin-bottom: 18px;
+      color: var(--amber);
+    }
+
+    /* ---- Logs ---- */
+    .log-list { font-family: var(--mono); font-size: 12px; }
+    .log-entry {
+      display: grid;
+      grid-template-columns: 160px 50px 1fr;
+      gap: 12px;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--border);
+      align-items: start;
+    }
+    .log-entry:last-child { border-bottom: none; }
+    .log-time { color: var(--muted); }
+    .log-level { font-weight: 500; }
+    .log-level.INFO { color: var(--blue); }
+    .log-level.ERROR { color: var(--red); }
+    .log-level.DEBUG { color: var(--muted); }
+    .log-msg { color: var(--text); word-break: break-word; }
+
+    /* ---- Settings ---- */
+    .settings-grid { max-width: 520px; }
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .setting-label { font-weight: 500; font-size: 13.5px; }
+    .setting-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .setting-control { flex-shrink: 0; margin-left: 20px; }
+    .setting-control input { width: 100px; text-align: right; }
+
+    /* ---- Empty state ---- */
+    .empty {
+      padding: 40px 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .empty-icon { font-size: 28px; margin-bottom: 10px; opacity: 0.4; }
+
+    /* ---- Toast ---- */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 12px 18px;
+      font-size: 13px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      transform: translateY(80px);
+      opacity: 0;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+      z-index: 999;
+      max-width: 340px;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.success { border-color: rgba(34,197,94,0.4); }
+    #toast.error { border-color: rgba(239,68,68,0.4); }
+
+    /* ---- Divider ---- */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+    /* ---- Alert ---- */
+    .alert {
+      padding: 12px 16px;
+      border-radius: 7px;
+      font-size: 13px;
+      margin-bottom: 18px;
+    }
+    .alert-warning { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); color: var(--amber); }
+    .alert-error { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); color: var(--red); }
+
+    /* ---- Stats row ---- */
+    .stats-row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .stat {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+    .stat-label { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
+    .stat-value { font-family: var(--mono); font-size: 22px; font-weight: 500; color: var(--text); }
+    .stat-value.amber { color: var(--amber); }
+    .stat-value.green { color: var(--green); }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">&#9632; system</div>
+      <div class="logo-title">Gmail Labeler</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-item active" onclick="navigate('dashboard')">
+        <span class="nav-icon">&#9632;</span> Dashboard
+      </div>
+      <div class="nav-item" onclick="navigate('accounts')">
+        <span class="nav-icon">&#9675;</span> Accounts
+      </div>
+      <div class="nav-item" onclick="navigate('prompts')">
+        <span class="nav-icon">&#9671;</span> Prompts
+      </div>
+      <div class="nav-item" onclick="navigate('settings')">
+        <span class="nav-icon">&#9633;</span> Settings
+      </div>
+      <div class="nav-item" onclick="navigate('logs')">
+        <span class="nav-icon">&#9645;</span> Logs
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="status-pill">
+        <span class="status-dot" id="pollerDot"></span>
+        <span id="pollerLabel">idle</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main">
+
+    <!-- Dashboard -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Dashboard</div>
+          <div class="page-sub">Overview of your email scanning setup</div>
+        </div>
+        <button class="btn btn-ghost" onclick="scanNow()">&#9654; Scan Now</button>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat">
+          <div class="stat-label">Accounts</div>
+          <div class="stat-value amber" id="stat-accounts">—</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Active Prompts</div>
+          <div class="stat-value amber" id="stat-prompts">—</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Poll Interval</div>
+          <div class="stat-value" id="stat-interval">—</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Next Scan</div>
+          <div class="stat-value green" id="stat-next">—</div>
+        </div>
+      </div>
+
+      <div class="form-title">Recent Activity</div>
+      <div id="dashboard-logs" class="log-list">
+        <div class="empty"><div class="empty-icon">&#9648;</div>No logs yet.</div>
+      </div>
+    </div>
+
+    <!-- Accounts -->
+    <div class="page" id="page-accounts">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Accounts</div>
+          <div class="page-sub">Gmail accounts being monitored</div>
+        </div>
+        <button class="btn btn-primary" onclick="toggleAddAccount()">+ Add Account</button>
+      </div>
+
+      <div class="panel" id="add-account-panel">
+        <div class="panel-title">Connect a Gmail Account</div>
+        <p style="font-size:13px; color:var(--muted); margin-bottom:16px; line-height:1.6;">
+          Click below to start the Google OAuth flow. You will be redirected to Google to grant access, then returned here automatically.
+        </p>
+        <a class="btn btn-primary" href="/oauth/start">&#8594; Authorize with Google</a>
+      </div>
+
+      <div id="accounts-list">
+        <div class="empty"><div class="empty-icon">&#9675;</div>No accounts added yet.</div>
+      </div>
+    </div>
+
+    <!-- Prompts -->
+    <div class="page" id="page-prompts">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Prompts</div>
+          <div class="page-sub">Rules the AI uses to decide which label to apply</div>
+        </div>
+        <button class="btn btn-primary" onclick="toggleAddPrompt()">+ Add Prompt</button>
+      </div>
+
+      <div class="panel" id="add-prompt-panel">
+        <div class="panel-title">New Labeling Rule</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Rule name</label>
+            <input type="text" id="new-prompt-name" placeholder="e.g. Urgent emails">
+          </div>
+          <div class="form-group">
+            <label>Gmail label to apply</label>
+            <input type="text" id="new-prompt-label" placeholder="e.g. AI/Urgent">
+            <div class="form-hint">Label will be created in Gmail if it doesn't exist.</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Instructions for the AI</label>
+          <textarea id="new-prompt-instructions" rows="3" placeholder="Describe what kind of emails should get this label. Be specific.&#10;e.g. Apply the label if this email requires a direct reply from me within 24 hours. Do not apply for newsletters or automated messages."></textarea>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-primary" onclick="createPrompt()">Save Rule</button>
+          <button class="btn btn-ghost" onclick="toggleAddPrompt()">Cancel</button>
+        </div>
+      </div>
+
+      <div id="prompts-list">
+        <div class="empty"><div class="empty-icon">&#9671;</div>No prompts yet. Add one to start labeling.</div>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="page" id="page-settings">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Settings</div>
+          <div class="page-sub">Configure scanning behavior</div>
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()">Save Changes</button>
+      </div>
+
+      <div class="settings-grid">
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Poll interval</div>
+            <div class="setting-desc">How often to scan for new emails (seconds). Minimum 30.</div>
+          </div>
+          <div class="setting-control">
+            <input type="number" id="setting-poll-interval" min="30" step="30" value="300">
+          </div>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Ollama model</div>
+            <div class="setting-desc">Set via OLLAMA_MODEL in docker-compose.yml</div>
+          </div>
+          <div class="setting-control">
+            <span class="tag" id="setting-model">—</span>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Ollama host</div>
+            <div class="setting-desc">Set via OLLAMA_HOST in docker-compose.yml</div>
+          </div>
+          <div class="setting-control">
+            <span class="tag" id="setting-host">—</span>
+          </div>
+        </div>
+      </div>
+
+      <hr class="divider">
+      <div class="form-title">Google Cloud Setup</div>
+      <div style="font-size:13px; color:var(--muted); line-height:1.8; max-width:560px;">
+        Place your <code style="font-family:var(--mono); font-size:12px; background:var(--surface2); padding:1px 5px; border-radius:3px;">credentials.json</code>
+        file from Google Cloud Console into the <code style="font-family:var(--mono); font-size:12px; background:var(--surface2); padding:1px 5px; border-radius:3px;">credentials/</code>
+        directory next to your docker-compose.yml.<br><br>
+        The OAuth redirect URI to add in Google Cloud Console is:<br>
+        <code id="redirect-uri" style="font-family:var(--mono); font-size:12px; background:var(--surface2); padding:4px 8px; border-radius:4px; display:inline-block; margin-top:4px; color:var(--amber);">Loading...</code>
+      </div>
+    </div>
+
+    <!-- Logs -->
+    <div class="page" id="page-logs">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Logs</div>
+          <div class="page-sub">Last 100 events</div>
+        </div>
+        <button class="btn btn-ghost" onclick="loadLogs()">&#8635; Refresh</button>
+      </div>
+      <div id="logs-list" class="log-list">
+        <div class="empty"><div class="empty-icon">&#9645;</div>No logs yet.</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  // ---- Navigation ----
+  function navigate(page) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('page-' + page).classList.add('active');
+    event.currentTarget.classList.add('active');
+    if (page === 'accounts') loadAccounts();
+    if (page === 'prompts') loadPrompts();
+    if (page === 'settings') loadSettings();
+    if (page === 'logs') loadLogs();
+    if (page === 'dashboard') loadDashboard();
+  }
+
+  // ---- Toast ----
+  let toastTimer;
+  function toast(msg, type = 'success') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'show ' + type;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+  }
+
+  // ---- Dashboard ----
+  async function loadDashboard() {
+    const [accounts, prompts, settings, status, logs] = await Promise.all([
+      fetch('/api/accounts').then(r => r.json()),
+      fetch('/api/prompts').then(r => r.json()),
+      fetch('/api/settings').then(r => r.json()),
+      fetch('/api/status').then(r => r.json()),
+      fetch('/api/logs?limit=15').then(r => r.json()),
+    ]);
+    document.getElementById('stat-accounts').textContent = accounts.length;
+    document.getElementById('stat-prompts').textContent = prompts.filter(p => p.active).length;
+    document.getElementById('stat-interval').textContent = fmtInterval(settings.poll_interval);
+    const nextRun = status.next_run;
+    if (nextRun) {
+      const secs = Math.max(0, Math.round(nextRun - status.current_time));
+      document.getElementById('stat-next').textContent = secs > 0 ? fmtInterval(secs) : 'now';
+    } else {
+      document.getElementById('stat-next').textContent = '—';
+    }
+    renderLogs(logs, 'dashboard-logs');
+    updatePollerStatus(status);
+  }
+
+  function fmtInterval(secs) {
+    if (secs >= 3600) return Math.round(secs / 3600) + 'h';
+    if (secs >= 60) return Math.round(secs / 60) + 'm';
+    return secs + 's';
+  }
+
+  function updatePollerStatus(status) {
+    const dot = document.getElementById('pollerDot');
+    const label = document.getElementById('pollerLabel');
+    if (status.running) {
+      dot.classList.add('active');
+      label.textContent = 'running';
+    } else {
+      dot.classList.remove('active');
+      label.textContent = 'stopped';
+    }
+  }
+
+  // ---- Accounts ----
+  async function loadAccounts() {
+    const accounts = await fetch('/api/accounts').then(r => r.json());
+    const el = document.getElementById('accounts-list');
+    if (!accounts.length) {
+      el.innerHTML = '<div class="empty"><div class="empty-icon">&#9675;</div>No accounts added yet.</div>';
+      return;
+    }
+    el.innerHTML = accounts.map(a => `
+      <div class="card">
+        <div class="card-row">
+          <div>
+            <div class="card-title">${esc(a.email)}</div>
+            <div class="card-meta">Added ${fmtDate(a.added_at)} · Last scanned ${a.last_scan_at ? fmtDate(a.last_scan_at) : 'never'}</div>
+            ${a.active ? '<span class="badge badge-green">&#9679; active</span>' : '<span class="badge badge-muted">paused</span>'}
+          </div>
+          <div class="card-actions">
+            <button class="btn btn-ghost btn-sm" onclick="toggleAccount(${a.id}, ${a.active})">${a.active ? 'Pause' : 'Resume'}</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteAccount(${a.id})">Remove</button>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+  function toggleAddAccount() {
+    const p = document.getElementById('add-account-panel');
+    p.classList.toggle('open');
+  }
+
+  async function toggleAccount(id, current) {
+    await fetch(`/api/accounts/${id}/toggle`, { method: 'POST' });
+    toast(current ? 'Account paused.' : 'Account resumed.');
+    loadAccounts();
+  }
+
+  async function deleteAccount(id) {
+    if (!confirm('Remove this account? Processed email history for it will also be cleared.')) return;
+    await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
+    toast('Account removed.');
+    loadAccounts();
+  }
+
+  // ---- Prompts ----
+  async function loadPrompts() {
+    const prompts = await fetch('/api/prompts').then(r => r.json());
+    const el = document.getElementById('prompts-list');
+    if (!prompts.length) {
+      el.innerHTML = '<div class="empty"><div class="empty-icon">&#9671;</div>No prompts yet. Add one to start labeling.</div>';
+      return;
+    }
+    el.innerHTML = prompts.map(p => `
+      <div class="card" id="prompt-card-${p.id}">
+        <div class="card-row">
+          <div style="flex:1">
+            <div class="card-title">${esc(p.name)}</div>
+            <div class="card-meta">Created ${fmtDate(p.created_at)}</div>
+            <div style="margin-bottom:10px;">
+              <span class="tag">&#9654; ${esc(p.label_name)}</span>
+              ${p.active ? '<span class="badge badge-green" style="margin-left:6px;">&#9679; active</span>' : '<span class="badge badge-muted" style="margin-left:6px;">paused</span>'}
+            </div>
+            <div id="prompt-view-${p.id}" style="font-size:13px; color:var(--muted); line-height:1.6;">${esc(p.instructions)}</div>
+            <div id="prompt-edit-${p.id}" style="display:none; margin-top:12px;">
+              <div class="form-row" style="margin-bottom:10px;">
+                <div class="form-group">
+                  <label>Rule name</label>
+                  <input type="text" id="edit-name-${p.id}" value="${esc(p.name)}">
+                </div>
+                <div class="form-group">
+                  <label>Gmail label</label>
+                  <input type="text" id="edit-label-${p.id}" value="${esc(p.label_name)}">
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Instructions</label>
+                <textarea id="edit-instructions-${p.id}" rows="3">${esc(p.instructions)}</textarea>
+              </div>
+              <div style="display:flex; gap:8px;">
+                <button class="btn btn-primary btn-sm" onclick="savePrompt(${p.id})">Save</button>
+                <button class="btn btn-ghost btn-sm" onclick="cancelEdit(${p.id})">Cancel</button>
+              </div>
+            </div>
+          </div>
+          <div class="card-actions" style="align-self:flex-start;">
+            <button class="btn btn-ghost btn-sm" onclick="togglePromptActive(${p.id}, ${p.active})">${p.active ? 'Pause' : 'Resume'}</button>
+            <button class="btn btn-ghost btn-sm" onclick="editPrompt(${p.id})">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="deletePrompt(${p.id})">Delete</button>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+  function toggleAddPrompt() {
+    document.getElementById('add-prompt-panel').classList.toggle('open');
+  }
+
+  async function createPrompt() {
+    const name = document.getElementById('new-prompt-name').value.trim();
+    const instructions = document.getElementById('new-prompt-instructions').value.trim();
+    const label_name = document.getElementById('new-prompt-label').value.trim();
+    if (!name || !instructions || !label_name) { toast('All fields are required.', 'error'); return; }
+    const r = await fetch('/api/prompts', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, instructions, label_name }),
+    });
+    if (r.ok) {
+      toast('Rule created.');
+      document.getElementById('new-prompt-name').value = '';
+      document.getElementById('new-prompt-instructions').value = '';
+      document.getElementById('new-prompt-label').value = '';
+      document.getElementById('add-prompt-panel').classList.remove('open');
+      loadPrompts();
+    } else {
+      const e = await r.json();
+      toast(e.error || 'Error creating rule.', 'error');
+    }
+  }
+
+  function editPrompt(id) {
+    document.getElementById('prompt-view-' + id).style.display = 'none';
+    document.getElementById('prompt-edit-' + id).style.display = 'block';
+  }
+
+  function cancelEdit(id) {
+    document.getElementById('prompt-view-' + id).style.display = 'block';
+    document.getElementById('prompt-edit-' + id).style.display = 'none';
+  }
+
+  async function savePrompt(id) {
+    const name = document.getElementById('edit-name-' + id).value.trim();
+    const instructions = document.getElementById('edit-instructions-' + id).value.trim();
+    const label_name = document.getElementById('edit-label-' + id).value.trim();
+    await fetch(`/api/prompts/${id}`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, instructions, label_name, active: 1 }),
+    });
+    toast('Rule updated.');
+    loadPrompts();
+  }
+
+  async function togglePromptActive(id, current) {
+    const r = await fetch(`/api/prompts/${id}`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        name: document.getElementById('edit-name-' + id)?.value || '',
+        instructions: '',
+        label_name: '',
+        active: current ? 0 : 1,
+      }),
+    });
+    // Re-fetch to get full data for the toggle
+    const prompts = await fetch('/api/prompts').then(r => r.json());
+    const p = prompts.find(x => x.id === id);
+    if (p) {
+      await fetch(`/api/prompts/${id}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ name: p.name, instructions: p.instructions, label_name: p.label_name, active: current ? 0 : 1 }),
+      });
+    }
+    toast(current ? 'Rule paused.' : 'Rule resumed.');
+    loadPrompts();
+  }
+
+  async function deletePrompt(id) {
+    if (!confirm('Delete this rule?')) return;
+    await fetch(`/api/prompts/${id}`, { method: 'DELETE' });
+    toast('Rule deleted.');
+    loadPrompts();
+  }
+
+  // ---- Settings ----
+  async function loadSettings() {
+    const s = await fetch('/api/settings').then(r => r.json());
+    document.getElementById('setting-poll-interval').value = s.poll_interval;
+    document.getElementById('setting-model').textContent = s.ollama_model;
+    document.getElementById('setting-host').textContent = s.ollama_host;
+    document.getElementById('redirect-uri').textContent = window.location.origin + '/oauth/callback';
+  }
+
+  async function saveSettings() {
+    const poll_interval = parseInt(document.getElementById('setting-poll-interval').value, 10);
+    const r = await fetch('/api/settings', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ poll_interval }),
+    });
+    if (r.ok) { toast('Settings saved.'); }
+    else { const e = await r.json(); toast(e.error || 'Error', 'error'); }
+  }
+
+  // ---- Logs ----
+  async function loadLogs() {
+    const logs = await fetch('/api/logs?limit=100').then(r => r.json());
+    renderLogs(logs, 'logs-list');
+  }
+
+  function renderLogs(logs, containerId) {
+    const el = document.getElementById(containerId);
+    if (!logs.length) {
+      el.innerHTML = '<div class="empty"><div class="empty-icon">&#9645;</div>No logs yet.</div>';
+      return;
+    }
+    el.innerHTML = logs.map(l => `
+      <div class="log-entry">
+        <span class="log-time">${fmtDate(l.timestamp)}</span>
+        <span class="log-level ${l.level}">${l.level}</span>
+        <span class="log-msg">${esc(l.message)}</span>
+      </div>`).join('');
+  }
+
+  // ---- Scan now ----
+  async function scanNow() {
+    await fetch('/api/scan', { method: 'POST' });
+    toast('Scan triggered. Check logs for results.');
+    setTimeout(loadDashboard, 2000);
+  }
+
+  // ---- Helpers ----
+  function esc(str) {
+    return String(str || '')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  }
+
+  function fmtDate(str) {
+    if (!str) return '—';
+    const d = new Date(str.endsWith('Z') ? str : str + 'Z');
+    return d.toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+  }
+
+  // ---- OAuth success notification ----
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('added') === '1') {
+    toast('Gmail account connected successfully!');
+    window.history.replaceState({}, '', '/');
+  }
+
+  // ---- Init ----
+  loadDashboard();
+  setInterval(loadDashboard, 30000);
+</script>
+</body>
+</html>

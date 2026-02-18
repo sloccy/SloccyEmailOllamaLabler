@@ -1,0 +1,38 @@
+services:
+  ollama:
+    image: ollama/ollama
+    container_name: gmail-labeler-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    # Expose internally only; not needed outside the stack
+    networks:
+      - internal
+
+  app:
+    build: .
+    container_name: gmail-labeler-app
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/data
+      - ./credentials:/credentials
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL=llama3.2
+      - DATA_DIR=/data
+      - CREDENTIALS_FILE=/credentials/credentials.json
+      # Change this if accessing from another machine on your network
+      - BASE_URL=http://10.0.0.5:5000
+      - FLASK_SECRET_KEY=change-me-to-something-random
+    depends_on:
+      - ollama
+    restart: unless-stopped
+    networks:
+      - internal
+
+volumes:
+  ollama_data:
+
+networks:
+  internal:
