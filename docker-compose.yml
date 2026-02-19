@@ -2,26 +2,33 @@ services:
   ollama:
     image: ollama/ollama
     container_name: gmail-labeler-ollama
+    privileged: true
+    cpuset: "0,1,2,3,4"
     volumes:
       - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_NUM_PARALLEL=1
     restart: unless-stopped
+    # Expose internally only; not needed outside the stack
     networks:
       - internal
 
   app:
-    build: .
+    image: ghcr.io/sloccy/sloccyemailollamalabeler:latest
     container_name: gmail-labeler-app
     ports:
-      - "5000:5000"
+      - "5001:5000"
     volumes:
-      - ./data:/data
-      - ./credentials:/credentials
+      - /opt/gmail-labeler/data:/data
+      - /opt/gmail-labeler/credentials:/credentials
     environment:
       - OLLAMA_HOST=http://ollama:11434
-      - OLLAMA_MODEL=llama3.2
+      - OLLAMA_MODEL=qwen3:4b-instruct-2507-q4_K_M
       - DATA_DIR=/data
       - CREDENTIALS_FILE=/credentials/credentials.json
-      - FLASK_SECRET_KEY=change-me-to-something-random
+      # Change this if accessing from another machine on your network
+      - BASE_URL=http://10.0.0.5:5001
+      - FLASK_SECRET_KEY=
     depends_on:
       - ollama
     restart: unless-stopped

@@ -43,7 +43,8 @@ Reply with only one word: YES or NO."""
             "model": OLLAMA_MODEL,
             "prompt": prompt,
             "stream": False,
-            "options": {"temperature": 0, "num_predict": 5},
+            "think": False,
+            "options": {"temperature": 0, "num_predict": 5, "num_ctx": 2048,},
         },
         timeout=600,
     )
