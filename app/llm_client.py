@@ -38,16 +38,18 @@ Based on the rule above, should this email be labeled?
 Reply with only one word: YES or NO."""
 
     response = requests.post(
-        f"{OLLAMA_HOST}/api/generate",
+        f"{OLLAMA_HOST}/api/chat",
         json={
             "model": OLLAMA_MODEL,
-            "prompt": prompt,
+            "messages": [
+                {"role": "system", "content": "You are an email classification assistant. Your only job is to decide whether to apply a label to an email based on a rule. Reply with only one word: YES or NO."},
+                {"role": "user", "content": f"Rule: {instructions}\n\nEmail:\nFrom: {email['sender']}\nSubject: {email['subject']}\nBody:\n{email['body'] or email['snippet']}\n\nShould this email be labeled?"}
+            ],
             "stream": False,
             "think": False,
-            "options": {"temperature": 0, "num_predict": 5, "num_ctx": 2048,},
+            "options": {"temperature": 0, "num_predict": 5, "num_ctx": 2048}
         },
         timeout=600,
     )
-    response.raise_for_status()
-    answer = response.json().get("response", "").strip().upper()
+    answer = response.json().get("message", {}).get("content", "").strip().upper()
     return answer.startswith("YES")
