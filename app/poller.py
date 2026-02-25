@@ -72,8 +72,9 @@ def _scan_account(account, prompts):
             db.update_last_scan(account_id)
             return
 
-        db.add_log("INFO", f"[{email_addr}] Processing {len(new_emails)} new email(s).")
+        db.add_log("INFO", f"[{email_addr}] Processing {len(new_emails)} new email(s) against {len(prompts)} rule(s) in batch.")
 
+        # Pre-fetch/create all label IDs up front
         label_cache = {}
         for prompt in prompts:
             if prompt["label_name"] not in label_cache:
@@ -81,10 +82,19 @@ def _scan_account(account, prompts):
                     service, prompt["label_name"]
                 )
 
+        # Build a lookup dict for prompts by id
+        prompts_by_id = {p["id"]: p for p in prompts}
+
         for email in new_emails:
-            for prompt in prompts:
-                try:
-                    if llm_client.should_apply_label(email, prompt["instructions"]):
+            try:
+                # One LLM call for all prompts
+                results = llm_client.classify_email_batch(email, prompts)
+
+                for prompt_id, should_label in results.items():
+                    prompt = prompts_by_id.get(prompt_id)
+                    if not prompt:
+                        continue
+                    if should_label:
                         gmail_client.apply_label(service, email["id"], label_cache[prompt["label_name"]])
                         db.add_log(
                             "INFO",
@@ -95,8 +105,9 @@ def _scan_account(account, prompts):
                             "DEBUG",
                             f"[{email_addr}] Skipped '{email['subject'][:60]}' for rule: {prompt['name']}",
                         )
-                except Exception as e:
-                    db.add_log("ERROR", f"[{email_addr}] LLM error on '{email['subject'][:60]}': {e}")
+
+            except Exception as e:
+                db.add_log("ERROR", f"[{email_addr}] Batch LLM error on '{email['subject'][:60]}': {e}")
 
             db.mark_processed(account_id, email["id"])
 

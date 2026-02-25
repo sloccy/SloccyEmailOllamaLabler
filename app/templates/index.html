@@ -443,7 +443,25 @@
 
   function copyAuthUrl() {
     if (!_authUrl) return;
-    navigator.clipboard.writeText(_authUrl).then(() => toast('Link copied to clipboard.'));
+    // Use clipboard API if available (HTTPS), otherwise fallback for HTTP/local IP
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(_authUrl).then(() => toast('Link copied to clipboard.'));
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = _authUrl;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try {
+        document.execCommand('copy');
+        toast('Link copied to clipboard.');
+      } catch (e) {
+        toast('Copy failed — please select and copy the link manually.', 'error');
+      }
+      document.body.removeChild(ta);
+    }
   }
 
   // Enable the connect button once user starts typing
