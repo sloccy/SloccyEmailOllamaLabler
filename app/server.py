@@ -5,22 +5,10 @@ from urllib.parse import urlparse, parse_qs
 from flask import Flask, jsonify, request, render_template, session, Response
 from app import db, gmail_client, poller, llm_client
 
-def _get_secret_key():
-    key = os.getenv("FLASK_SECRET_KEY")
-    if key:
-        return key
-    # Persist a stable key in the DB so sessions survive restarts
-    from app import db as _db
-    stored = _db.get_setting("flask_secret_key")
-    if stored:
-        return stored
-    new_key = secrets.token_hex(32)
-    _db.set_setting("flask_secret_key", new_key)
-    return new_key
-
-
 app = Flask(__name__, template_folder="templates")
-app.secret_key = os.getenv("FLASK_SECRET_KEY", secrets.token_hex(32))  # replaced below after db init
+# Secret key is auto-generated on first run and persisted in the DB,
+# so sessions survive container restarts without any manual configuration.
+app.secret_key = "placeholder-replaced-at-startup"
 
 
 # ---- UI ----
@@ -213,6 +201,10 @@ def api_get_settings():
         "poll_interval": int(db.get_setting("poll_interval", "300")),
         "ollama_model": os.getenv("OLLAMA_MODEL", "llama3.2"),
         "ollama_host": os.getenv("OLLAMA_HOST", "http://localhost:11434"),
+        "ollama_timeout": int(os.getenv("OLLAMA_TIMEOUT", "600")),
+        "ollama_num_ctx": int(os.getenv("OLLAMA_NUM_CTX", "4096")),
+        "ollama_num_predict": int(os.getenv("OLLAMA_NUM_PREDICT", "200")),
+        "gmail_max_results": int(os.getenv("GMAIL_MAX_RESULTS", "50")),
     })
 
 
@@ -251,9 +243,17 @@ def api_scan_now():
 
 # ---- Startup ----
 
+def _get_or_create_secret_key() -> str:
+    key = db.get_setting("flask_secret_key")
+    if not key:
+        key = secrets.token_hex(32)
+        db.set_setting("flask_secret_key", key)
+    return key
+
+
 def create_app():
     db.init_db()
-    app.secret_key = _get_secret_key()
+    app.secret_key = _get_or_create_secret_key()
     import threading
     threading.Thread(target=llm_client.ensure_model_pulled, daemon=True).start()
     poller.start()

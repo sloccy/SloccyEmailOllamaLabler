@@ -6,6 +6,8 @@ from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 
+GMAIL_MAX_RESULTS = int(os.getenv("GMAIL_MAX_RESULTS", "50"))
+
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.modify",
     "https://www.googleapis.com/auth/userinfo.email",
@@ -64,7 +66,7 @@ def get_or_create_label(service, label_name: str) -> str:
     return created["id"]
 
 
-def fetch_recent_emails(service, max_results=5):
+def fetch_recent_emails(service, max_results=GMAIL_MAX_RESULTS):
     response = service.users().messages().list(
         userId="me", maxResults=max_results, q="in:inbox"
     ).execute()

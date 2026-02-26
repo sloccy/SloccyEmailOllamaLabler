@@ -5,6 +5,9 @@ from app import db
 
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
+OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "600"))
+OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "4096"))
+OLLAMA_NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "200"))
 
 
 def ensure_model_pulled():
@@ -18,7 +21,7 @@ def ensure_model_pulled():
             requests.post(
                 f"{OLLAMA_HOST}/api/pull",
                 json={"name": OLLAMA_MODEL, "stream": False},
-                timeout=600,
+                timeout=OLLAMA_TIMEOUT,
             )
             print(f"Model {OLLAMA_MODEL} ready.")
     except Exception as e:
@@ -67,9 +70,13 @@ No explanation, no markdown, just the JSON object."""
             "stream": False,
             "think": False,
             "format": "json",
-            "options": {"temperature": 0, "num_predict": 200, "num_ctx": 4096},
+            "options": {
+                "temperature": 0,
+                "num_predict": OLLAMA_NUM_PREDICT,
+                "num_ctx": OLLAMA_NUM_CTX,
+            },
         },
-        timeout=600,
+        timeout=OLLAMA_TIMEOUT,
     )
     response.raise_for_status()
 
