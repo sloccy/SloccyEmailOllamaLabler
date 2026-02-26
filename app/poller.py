@@ -41,18 +41,18 @@ def _loop():
 def _scan_all_accounts():
     _status["last_run"] = time.time()
     accounts = [a for a in db.list_accounts() if a["active"]]
-    prompts = [p for p in db.list_prompts() if p["active"]]
 
     if not accounts:
         db.add_log("INFO", "Poller ran: no active accounts configured.")
         return
-    if not prompts:
-        db.add_log("INFO", "Poller ran: no active prompts configured.")
-        return
-
-    db.add_log("INFO", f"Starting scan: {len(accounts)} account(s), {len(prompts)} prompt(s).")
 
     for account in accounts:
+        # Get prompts that apply to this account (account-specific + global)
+        prompts = [p for p in db.list_prompts(account_id=account["id"]) if p["active"]]
+        if not prompts:
+            db.add_log("INFO", f"[{account['email']}] No active prompts for this account.")
+            continue
+        db.add_log("INFO", f"Starting scan: [{account['email']}] with {len(prompts)} prompt(s).")
         _scan_account(account, prompts)
 
 
@@ -72,7 +72,7 @@ def _scan_account(account, prompts):
             db.update_last_scan(account_id)
             return
 
-        db.add_log("INFO", f"[{email_addr}] Processing {len(new_emails)} new email(s) against {len(prompts)} rule(s) in batch.")
+        db.add_log("INFO", f"[{email_addr}] Processing {len(new_emails)} new email(s) against {len(prompts)} rule(s).")
 
         # Pre-fetch/create all label IDs up front
         label_cache = {}
@@ -81,24 +81,46 @@ def _scan_account(account, prompts):
                 label_cache[prompt["label_name"]] = gmail_client.get_or_create_label(
                     service, prompt["label_name"]
                 )
+            move_to = prompt.get("action_move_to", "").strip()
+            if move_to and move_to not in label_cache:
+                label_cache[move_to] = gmail_client.get_or_create_label(service, move_to)
 
-        # Build a lookup dict for prompts by id
         prompts_by_id = {p["id"]: p for p in prompts}
 
         for email in new_emails:
             try:
-                # One LLM call for all prompts
                 results = llm_client.classify_email_batch(email, prompts)
+                stop = False
 
-                for prompt_id, should_label in results.items():
-                    prompt = prompts_by_id.get(prompt_id)
-                    if not prompt:
-                        continue
+                for prompt in prompts:
+                    if stop:
+                        break
+                    prompt_id = prompt["id"]
+                    should_label = results.get(prompt_id, False)
+
                     if should_label:
                         gmail_client.apply_label(service, email["id"], label_cache[prompt["label_name"]])
+                        actions_taken = [f"labeled → {prompt['label_name']}"]
+
+                        if prompt.get("action_spam"):
+                            gmail_client.spam_email(service, email["id"])
+                            actions_taken.append("sent to spam")
+                        elif prompt.get("action_archive"):
+                            gmail_client.archive_email(service, email["id"])
+                            actions_taken.append("archived")
+
+                        move_to = prompt.get("action_move_to", "").strip()
+                        if move_to and not prompt.get("action_spam"):
+                            gmail_client.move_to_folder(service, email["id"], label_cache[move_to])
+                            actions_taken.append(f"moved to {move_to}")
+
+                        if prompt.get("stop_processing"):
+                            actions_taken.append("stopped further rules")
+                            stop = True
+
                         db.add_log(
                             "INFO",
-                            f"[{email_addr}] Labeled '{email['subject'][:60]}' → {prompt['label_name']} (rule: {prompt['name']})",
+                            f"[{email_addr}] '{email['subject'][:60]}' — {', '.join(actions_taken)} (rule: {prompt['name']})",
                         )
                     else:
                         db.add_log(
@@ -107,7 +129,7 @@ def _scan_account(account, prompts):
                         )
 
             except Exception as e:
-                db.add_log("ERROR", f"[{email_addr}] Batch LLM error on '{email['subject'][:60]}': {e}")
+                db.add_log("ERROR", f"[{email_addr}] Error processing '{email['subject'][:60]}': {e}")
 
             db.mark_processed(account_id, email["id"])
 

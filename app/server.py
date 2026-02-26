@@ -1,68 +1,54 @@
 import os
+import json
 import secrets
 from urllib.parse import urlparse, parse_qs
-from flask import Flask, jsonify, request, render_template, session
+from flask import Flask, jsonify, request, render_template, session, Response
 from app import db, gmail_client, poller, llm_client
 
 app = Flask(__name__, template_folder="templates")
 app.secret_key = os.getenv("FLASK_SECRET_KEY", secrets.token_hex(32))
 
 
-# ---------------------------------------------------------------------------
-# UI
-# ---------------------------------------------------------------------------
+# ---- UI ----
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
 
-# ---------------------------------------------------------------------------
-# OAuth - Desktop app flow (no redirect URI registration needed)
-# ---------------------------------------------------------------------------
+# ---- OAuth ----
 
 @app.route("/api/oauth/start", methods=["POST"])
 def oauth_start():
-    """Generate and return the Google auth URL for the user to open manually."""
     state = secrets.token_urlsafe(16)
     session["oauth_state"] = state
     try:
         auth_url = gmail_client.get_auth_url(state)
         return jsonify({"auth_url": auth_url, "state": state})
     except FileNotFoundError:
-        return jsonify({"error": "credentials.json not found. Place your Google OAuth credentials file at /credentials/credentials.json inside the container (./credentials/ on the host)."}), 500
+        return jsonify({"error": "credentials.json not found. Place your Google OAuth credentials file at /credentials/credentials.json."}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/oauth/exchange", methods=["POST"])
 def oauth_exchange():
-    """
-    Accept the full redirect URL that the user copied from their browser
-    after approving access. Extract the code and exchange it for tokens.
-    """
     data = request.json
     pasted_url = data.get("url", "").strip()
-
     if not pasted_url:
         return jsonify({"error": "No URL provided."}), 400
-
-    # Parse the code and state out of the pasted URL
     try:
         parsed = urlparse(pasted_url)
         params = parse_qs(parsed.query)
         code = params.get("code", [None])[0]
         state = params.get("state", [None])[0]
     except Exception:
-        return jsonify({"error": "Could not parse the URL. Make sure you copied the full URL from your browser's address bar."}), 400
-
+        return jsonify({"error": "Could not parse the URL."}), 400
     if not code:
-        return jsonify({"error": "No authorization code found in the URL. Make sure you copied the full URL from your browser's address bar after approving access."}), 400
-
+        return jsonify({"error": "No authorization code found in the URL."}), 400
     expected_state = session.get("oauth_state")
     if not expected_state or state != expected_state:
         return jsonify({"error": "State mismatch. Please start the authorization process again."}), 400
-
     try:
         email, credentials_json = gmail_client.exchange_code(state, code)
         db.upsert_account(email, credentials_json)
@@ -73,9 +59,7 @@ def oauth_exchange():
         return jsonify({"error": str(e)}), 500
 
 
-# ---------------------------------------------------------------------------
-# Accounts API
-# ---------------------------------------------------------------------------
+# ---- Accounts ----
 
 @app.route("/api/accounts", methods=["GET"])
 def api_list_accounts():
@@ -102,13 +86,18 @@ def api_toggle_account(account_id):
     return jsonify({"active": new_state})
 
 
-# ---------------------------------------------------------------------------
-# Prompts API
-# ---------------------------------------------------------------------------
+# ---- Prompts ----
 
 @app.route("/api/prompts", methods=["GET"])
 def api_list_prompts():
-    return jsonify(db.list_prompts())
+    # Optional filter: ?account_id=1 returns prompts for that account + global prompts
+    # No param returns all prompts (for the management UI)
+    account_id = request.args.get("account_id")
+    if account_id:
+        prompts = db.list_prompts(account_id=int(account_id))
+    else:
+        prompts = db.list_prompts()
+    return jsonify(prompts)
 
 
 @app.route("/api/prompts", methods=["POST"])
@@ -116,20 +105,37 @@ def api_create_prompt():
     data = request.json
     if not data.get("name") or not data.get("instructions") or not data.get("label_name"):
         return jsonify({"error": "name, instructions, and label_name are required"}), 400
-    db.create_prompt(data["name"], data["instructions"], data["label_name"])
-    db.add_log("INFO", f"Prompt created: {data['name']} → label '{data['label_name']}'")
+    account_id = data.get("account_id")
+    db.create_prompt(
+        data["name"],
+        data["instructions"],
+        data["label_name"],
+        action_archive=int(data.get("action_archive", 0)),
+        action_spam=int(data.get("action_spam", 0)),
+        action_move_to=data.get("action_move_to", "").strip(),
+        stop_processing=int(data.get("stop_processing", 0)),
+        account_id=int(account_id) if account_id else None,
+    )
+    scope = f"account {account_id}" if account_id else "all accounts"
+    db.add_log("INFO", f"Prompt created: {data['name']} → label '{data['label_name']}' ({scope})")
     return jsonify({"ok": True}), 201
 
 
 @app.route("/api/prompts/<int:prompt_id>", methods=["PUT"])
 def api_update_prompt(prompt_id):
     data = request.json
+    account_id = data.get("account_id")
     db.update_prompt(
         prompt_id,
         data["name"],
         data["instructions"],
         data["label_name"],
         int(data.get("active", 1)),
+        action_archive=int(data.get("action_archive", 0)),
+        action_spam=int(data.get("action_spam", 0)),
+        action_move_to=data.get("action_move_to", "").strip(),
+        stop_processing=int(data.get("stop_processing", 0)),
+        account_id=int(account_id) if account_id else None,
     )
     return jsonify({"ok": True})
 
@@ -140,9 +146,52 @@ def api_delete_prompt(prompt_id):
     return jsonify({"ok": True})
 
 
-# ---------------------------------------------------------------------------
-# Settings API
-# ---------------------------------------------------------------------------
+@app.route("/api/prompts/reorder", methods=["POST"])
+def api_reorder_prompts():
+    data = request.json
+    ordered_ids = data.get("ordered_ids", [])
+    if not ordered_ids:
+        return jsonify({"error": "ordered_ids required"}), 400
+    db.reorder_prompts([int(i) for i in ordered_ids])
+    return jsonify({"ok": True})
+
+
+@app.route("/api/prompts/export", methods=["GET"])
+def api_export_prompts():
+    """
+    Export prompts as a JSON file download.
+    Optional ?account_id=X to export only prompts for that account + globals.
+    Optional ?account_id=X&name=email@example.com to name the file nicely.
+    """
+    account_id = request.args.get("account_id")
+    account_name = request.args.get("name", "all")
+
+    if account_id:
+        prompts = db.list_prompts(account_id=int(account_id))
+    else:
+        prompts = db.list_prompts()
+
+    # Strip internal DB fields not useful for export
+    export_fields = ["name", "instructions", "label_name", "active", "action_archive",
+                     "action_spam", "action_move_to", "stop_processing", "account_id"]
+    export_data = [{k: p[k] for k in export_fields if k in p} for p in prompts]
+
+    # Resolve account_id to email for readability
+    accounts = {a["id"]: a["email"] for a in db.list_accounts()}
+    for p in export_data:
+        aid = p.get("account_id")
+        p["account"] = accounts.get(aid, "all accounts") if aid else "all accounts"
+        del p["account_id"]
+
+    filename = f"prompts-{account_name.replace('@', '_').replace('.', '_')}.json"
+    return Response(
+        json.dumps(export_data, indent=2),
+        mimetype="application/json",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+# ---- Settings ----
 
 @app.route("/api/settings", methods=["GET"])
 def api_get_settings():
@@ -165,9 +214,7 @@ def api_update_settings():
     return jsonify({"ok": True})
 
 
-# ---------------------------------------------------------------------------
-# Logs + Status
-# ---------------------------------------------------------------------------
+# ---- Logs + Status ----
 
 @app.route("/api/logs", methods=["GET"])
 def api_get_logs():
@@ -188,9 +235,7 @@ def api_scan_now():
     return jsonify({"ok": True})
 
 
-# ---------------------------------------------------------------------------
-# Startup
-# ---------------------------------------------------------------------------
+# ---- Startup ----
 
 def create_app():
     db.init_db()

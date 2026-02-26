@@ -9,28 +9,17 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg:        #0c0c0c;
-      --surface:   #131313;
-      --surface2:  #1a1a1a;
-      --border:    #252525;
-      --border2:   #2e2e2e;
-      --text:      #e2e2e2;
-      --muted:     #5a5a5a;
-      --muted2:    #3a3a3a;
-      --amber:     #f59e0b;
-      --green:     #22c55e;
-      --red:       #ef4444;
-      --blue:      #3b82f6;
-      --mono:      'IBM Plex Mono', monospace;
-      --sans:      'DM Sans', sans-serif;
+      --bg: #0c0c0c; --surface: #131313; --surface2: #1a1a1a;
+      --border: #252525; --border2: #2e2e2e;
+      --text: #e2e2e2; --muted: #5a5a5a; --muted2: #3a3a3a;
+      --amber: #f59e0b; --green: #22c55e; --red: #ef4444; --blue: #3b82f6;
+      --mono: 'IBM Plex Mono', monospace; --sans: 'DM Sans', sans-serif;
     }
-
     html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.5; }
-
     .layout { display: flex; height: 100vh; overflow: hidden; }
 
+    /* Sidebar */
     .sidebar { width: 220px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 24px 0; }
     .logo { padding: 0 20px 24px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
     .logo-mark { font-family: var(--mono); font-size: 11px; color: var(--amber); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 2px; }
@@ -45,6 +34,7 @@
     .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted2); transition: background 0.3s; }
     .status-dot.active { background: var(--green); box-shadow: 0 0 6px var(--green); }
 
+    /* Main */
     .main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
     .page { display: none; flex-direction: column; flex: 1; padding: 32px 36px; animation: fadeIn 0.2s ease; }
     .page.active { display: flex; }
@@ -54,6 +44,7 @@
     .page-title { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
     .page-sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
 
+    /* Buttons */
     .btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border: none; border-radius: 6px; font-family: var(--sans); font-size: 13px; font-weight: 500; cursor: pointer; transition: opacity 0.15s, transform 0.1s; text-decoration: none; }
     .btn:active { transform: scale(0.97); }
     .btn-primary { background: var(--amber); color: #000; }
@@ -65,6 +56,7 @@
     .btn-sm { padding: 5px 11px; font-size: 12px; }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+    /* Cards */
     .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px 22px; margin-bottom: 12px; }
     .card-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
     .card-title { font-weight: 600; font-size: 14.5px; margin-bottom: 3px; }
@@ -74,33 +66,62 @@
     .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; font-family: var(--mono); }
     .badge-green { background: rgba(34,197,94,0.12); color: var(--green); }
     .badge-muted { background: var(--surface2); color: var(--muted); }
+    .badge-amber { background: rgba(245,158,11,0.12); color: var(--amber); }
+    .badge-stop { background: rgba(239,68,68,0.1); color: var(--red); }
     .tag { display: inline-block; padding: 2px 9px; border-radius: 4px; font-size: 11.5px; font-family: var(--mono); background: rgba(245,158,11,0.1); color: var(--amber); border: 1px solid rgba(245,158,11,0.2); }
 
+    /* Forms */
     .form-group { margin-bottom: 14px; }
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .form-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
     label { display: block; font-size: 12.5px; font-weight: 500; color: var(--muted); margin-bottom: 6px; }
     input[type="text"], input[type="number"], textarea, select { width: 100%; background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; color: var(--text); font-family: var(--sans); font-size: 13.5px; padding: 9px 12px; outline: none; transition: border-color 0.15s; }
-    input:focus, textarea:focus { border-color: var(--amber); }
+    input:focus, textarea:focus, select:focus { border-color: var(--amber); }
+    select option { background: var(--surface2); }
     textarea { resize: vertical; min-height: 80px; }
     .form-hint { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
 
+    /* Panel */
     .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 22px; margin-bottom: 20px; display: none; }
     .panel.open { display: block; animation: fadeIn 0.2s ease; }
     .panel-title { font-size: 13.5px; font-weight: 600; margin-bottom: 18px; color: var(--amber); }
 
+    /* Actions */
+    .actions-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+    .action-item { display: flex; align-items: center; gap: 8px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; padding: 8px 12px; cursor: pointer; transition: border-color 0.15s; }
+    .action-item:hover { border-color: var(--muted); }
+    .action-item input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--amber); cursor: pointer; }
+    .action-item label { font-size: 12.5px; font-weight: 500; cursor: pointer; margin: 0; color: var(--text); }
+    .action-move-input { margin-top: 10px; display: none; }
+    .action-move-input.visible { display: block; }
+
+    /* Drag */
+    .drag-handle { cursor: grab; color: var(--muted2); font-size: 16px; padding: 0 8px 0 0; flex-shrink: 0; user-select: none; margin-top: 2px; }
+    .drag-handle:active { cursor: grabbing; }
+    .card.dragging { opacity: 0.4; border-color: var(--amber); }
+    .card.drag-over { border-color: var(--amber); border-style: dashed; }
+
+    /* Stop processing */
+    .stop-processing-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+    .stop-processing-row input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--red); cursor: pointer; }
+    .stop-processing-row label { font-size: 12.5px; font-weight: 500; cursor: pointer; margin: 0; color: var(--text); }
+
+    /* Filter bar */
+    .filter-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .filter-bar select { width: auto; min-width: 220px; }
+    .filter-bar label { margin: 0; white-space: nowrap; }
+
     /* OAuth steps */
-    .oauth-steps { counter-reset: steps; }
     .oauth-step { display: flex; gap: 14px; margin-bottom: 20px; }
     .oauth-step-num { width: 26px; height: 26px; border-radius: 50%; background: var(--surface2); border: 1px solid var(--border2); font-family: var(--mono); font-size: 11px; display: flex; align-items: center; justify-content: center; color: var(--amber); flex-shrink: 0; margin-top: 1px; }
     .oauth-step-body { flex: 1; }
     .oauth-step-label { font-size: 13px; font-weight: 500; margin-bottom: 8px; }
     .oauth-step-desc { font-size: 12.5px; color: var(--muted); margin-bottom: 10px; line-height: 1.6; }
     .oauth-step.done .oauth-step-num { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.3); color: var(--green); }
-
     .url-box { font-family: var(--mono); font-size: 11.5px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; padding: 10px 12px; word-break: break-all; color: var(--amber); line-height: 1.6; margin-bottom: 10px; display: none; }
     .url-box.visible { display: block; }
 
+    /* Logs */
     .log-list { font-family: var(--mono); font-size: 12px; }
     .log-entry { display: grid; grid-template-columns: 160px 50px 1fr; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--border); align-items: start; }
     .log-entry:last-child { border-bottom: none; }
@@ -111,6 +132,7 @@
     .log-level.DEBUG { color: var(--muted); }
     .log-msg { color: var(--text); word-break: break-word; }
 
+    /* Settings */
     .settings-grid { max-width: 520px; }
     .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--border); }
     .setting-label { font-weight: 500; font-size: 13.5px; }
@@ -118,31 +140,29 @@
     .setting-control { flex-shrink: 0; margin-left: 20px; }
     .setting-control input { width: 100px; text-align: right; }
 
-    .empty { padding: 40px 0; text-align: center; color: var(--muted); font-size: 13px; }
-    .empty-icon { font-size: 28px; margin-bottom: 10px; opacity: 0.4; }
-
-    #toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--border2); border-radius: 8px; padding: 12px 18px; font-size: 13px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); transform: translateY(80px); opacity: 0; transition: transform 0.25s ease, opacity 0.25s ease; z-index: 999; max-width: 340px; }
-    #toast.show { transform: translateY(0); opacity: 1; }
-    #toast.success { border-color: rgba(34,197,94,0.4); }
-    #toast.error { border-color: rgba(239,68,68,0.4); }
-
-    .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
-
-    .alert { padding: 12px 16px; border-radius: 7px; font-size: 13px; margin-bottom: 18px; line-height: 1.6; }
-    .alert-warning { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); color: var(--amber); }
-    .alert-error { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); color: var(--red); }
-    .alert-success { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.25); color: var(--green); }
-
+    /* Stats */
     .stats-row { display: flex; gap: 16px; margin-bottom: 28px; }
     .stat { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; }
     .stat-label { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
     .stat-value { font-family: var(--mono); font-size: 22px; font-weight: 500; }
     .stat-value.amber { color: var(--amber); }
     .stat-value.green { color: var(--green); }
+
+    /* Misc */
+    .empty { padding: 40px 0; text-align: center; color: var(--muted); font-size: 13px; }
+    .empty-icon { font-size: 28px; margin-bottom: 10px; opacity: 0.4; }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+    .alert { padding: 12px 16px; border-radius: 7px; font-size: 13px; margin-bottom: 18px; line-height: 1.6; }
+    .alert-error { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); color: var(--red); }
+    .alert-success { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.25); color: var(--green); }
+
+    #toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--border2); border-radius: 8px; padding: 12px 18px; font-size: 13px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); transform: translateY(80px); opacity: 0; transition: transform 0.25s ease, opacity 0.25s ease; z-index: 999; max-width: 340px; }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.success { border-color: rgba(34,197,94,0.4); }
+    #toast.error { border-color: rgba(239,68,68,0.4); }
   </style>
 </head>
 <body>
-
 <div class="layout">
   <aside class="sidebar">
     <div class="logo">
@@ -169,10 +189,7 @@
     <!-- Dashboard -->
     <div class="page active" id="page-dashboard">
       <div class="page-header">
-        <div>
-          <div class="page-title">Dashboard</div>
-          <div class="page-sub">Overview of your email scanning setup</div>
-        </div>
+        <div><div class="page-title">Dashboard</div><div class="page-sub">Overview of your email scanning setup</div></div>
         <button class="btn btn-ghost" onclick="scanNow()">&#9654; Scan Now</button>
       </div>
       <div class="stats-row">
@@ -188,21 +205,14 @@
     <!-- Accounts -->
     <div class="page" id="page-accounts">
       <div class="page-header">
-        <div>
-          <div class="page-title">Accounts</div>
-          <div class="page-sub">Gmail accounts being monitored</div>
-        </div>
+        <div><div class="page-title">Accounts</div><div class="page-sub">Gmail accounts being monitored</div></div>
         <button class="btn btn-primary" onclick="toggleAddAccount()">+ Add Account</button>
       </div>
-
-      <!-- OAuth panel -->
       <div class="panel" id="add-account-panel">
         <div class="panel-title">Connect a Gmail Account</div>
         <div id="oauth-error-box" class="alert alert-error" style="display:none;"></div>
         <div id="oauth-success-box" class="alert alert-success" style="display:none;"></div>
-
-        <div class="oauth-steps">
-
+        <div>
           <div class="oauth-step" id="oauth-step-1">
             <div class="oauth-step-num">1</div>
             <div class="oauth-step-body">
@@ -211,28 +221,20 @@
               <button class="btn btn-primary" id="btn-gen-url" onclick="startOAuth()">Generate Link</button>
             </div>
           </div>
-
           <div class="oauth-step" id="oauth-step-2">
             <div class="oauth-step-num">2</div>
             <div class="oauth-step-body">
               <div class="oauth-step-label">Open the link and approve access</div>
-              <div class="oauth-step-desc">
-                Open the link below in your browser. Sign in and click Allow.
-                After approving, your browser will try to open a page that fails to load — that is expected.
-              </div>
+              <div class="oauth-step-desc">Open the link below in your browser. After approving, your browser will try to open a page that fails to load — that is expected.</div>
               <div class="url-box" id="auth-url-box"></div>
               <button class="btn btn-ghost btn-sm" id="btn-copy-url" onclick="copyAuthUrl()" style="display:none;">Copy Link</button>
             </div>
           </div>
-
           <div class="oauth-step" id="oauth-step-3">
             <div class="oauth-step-num">3</div>
             <div class="oauth-step-body">
               <div class="oauth-step-label">Paste the redirect URL</div>
-              <div class="oauth-step-desc">
-                After clicking Allow, your browser will redirect to a URL starting with <code style="font-family:var(--mono);font-size:11.5px;background:var(--surface2);padding:1px 5px;border-radius:3px;">http://localhost/?code=...</code>
-                which will fail to load. Copy the full URL from your address bar and paste it here.
-              </div>
+              <div class="oauth-step-desc">After approving, your browser will redirect to <code style="font-family:var(--mono);font-size:11.5px;background:var(--surface2);padding:1px 5px;border-radius:3px;">http://localhost/?code=...</code> which fails to load. Copy the full URL from your address bar and paste it here.</div>
               <div class="form-group">
                 <input type="text" id="oauth-redirect-url" placeholder="http://localhost/?state=...&code=..." style="font-family:var(--mono);font-size:12px;">
               </div>
@@ -240,21 +242,27 @@
               <button class="btn btn-ghost" onclick="toggleAddAccount()" style="margin-left:8px;">Cancel</button>
             </div>
           </div>
-
         </div>
       </div>
-
       <div id="accounts-list"><div class="empty"><div class="empty-icon">&#9675;</div>No accounts added yet.</div></div>
     </div>
 
     <!-- Prompts -->
     <div class="page" id="page-prompts">
       <div class="page-header">
-        <div>
-          <div class="page-title">Prompts</div>
-          <div class="page-sub">Rules the AI uses to decide which label to apply</div>
+        <div><div class="page-title">Prompts</div><div class="page-sub">Rules the AI uses to decide which labels to apply</div></div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-ghost" onclick="exportPrompts()" id="btn-export">&#8595; Export</button>
+          <button class="btn btn-primary" onclick="toggleAddPrompt()">+ Add Prompt</button>
         </div>
-        <button class="btn btn-primary" onclick="toggleAddPrompt()">+ Add Prompt</button>
+      </div>
+
+      <!-- Filter bar -->
+      <div class="filter-bar">
+        <label style="color:var(--muted);font-size:12.5px;">Show rules for:</label>
+        <select id="prompt-filter-account" onchange="loadPrompts()">
+          <option value="">All accounts</option>
+        </select>
       </div>
 
       <div class="panel" id="add-prompt-panel">
@@ -271,10 +279,33 @@
           </div>
         </div>
         <div class="form-group">
-          <label>Instructions for the AI</label>
-          <textarea id="new-prompt-instructions" rows="3" placeholder="Describe what kind of emails should get this label.&#10;e.g. Apply the label if this email requires a direct reply from me within 24 hours. Do not apply for newsletters or automated messages."></textarea>
+          <label>Apply to account</label>
+          <select id="new-prompt-account">
+            <option value="">All accounts (global)</option>
+          </select>
+          <div class="form-hint">Global rules run on every account. Account-specific rules only run for that account.</div>
         </div>
-        <div style="display:flex;gap:10px;">
+        <div class="form-group">
+          <label>Instructions for the AI</label>
+          <textarea id="new-prompt-instructions" rows="3" placeholder="Describe what kind of emails should get this label. Be specific."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Actions when matched</label>
+          <div class="actions-grid">
+            <div class="action-item"><input type="checkbox" id="new-action-archive" onchange="toggleMoveInput('new')"><label for="new-action-archive">Archive</label></div>
+            <div class="action-item"><input type="checkbox" id="new-action-spam"><label for="new-action-spam">Send to Spam</label></div>
+            <div class="action-item"><input type="checkbox" id="new-action-move" onchange="toggleMoveInput('new')"><label for="new-action-move">Move to Folder</label></div>
+          </div>
+          <div class="action-move-input" id="new-move-input">
+            <input type="text" id="new-action-move-to" placeholder="Folder/label name to move to">
+            <div class="form-hint">Email will be moved out of inbox into this folder.</div>
+          </div>
+        </div>
+        <div class="stop-processing-row">
+          <input type="checkbox" id="new-stop-processing">
+          <label for="new-stop-processing">Stop processing further rules if this one matches</label>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:14px;">
           <button class="btn btn-primary" onclick="createPrompt()">Save Rule</button>
           <button class="btn btn-ghost" onclick="toggleAddPrompt()">Cancel</button>
         </div>
@@ -286,34 +317,20 @@
     <!-- Settings -->
     <div class="page" id="page-settings">
       <div class="page-header">
-        <div>
-          <div class="page-title">Settings</div>
-          <div class="page-sub">Configure scanning behavior</div>
-        </div>
+        <div><div class="page-title">Settings</div><div class="page-sub">Configure scanning behavior</div></div>
         <button class="btn btn-primary" onclick="saveSettings()">Save Changes</button>
       </div>
       <div class="settings-grid">
         <div class="setting-row">
-          <div>
-            <div class="setting-label">Poll interval</div>
-            <div class="setting-desc">How often to scan for new emails (seconds). Minimum 30.</div>
-          </div>
-          <div class="setting-control">
-            <input type="number" id="setting-poll-interval" min="30" step="30" value="300">
-          </div>
+          <div><div class="setting-label">Poll interval</div><div class="setting-desc">How often to scan for new emails (seconds). Minimum 30.</div></div>
+          <div class="setting-control"><input type="number" id="setting-poll-interval" min="30" step="30" value="300"></div>
         </div>
         <div class="setting-row">
-          <div>
-            <div class="setting-label">Ollama model</div>
-            <div class="setting-desc">Set via OLLAMA_MODEL in docker-compose.yml</div>
-          </div>
+          <div><div class="setting-label">Ollama model</div><div class="setting-desc">Set via OLLAMA_MODEL in docker-compose.yml</div></div>
           <div class="setting-control"><span class="tag" id="setting-model">—</span></div>
         </div>
         <div class="setting-row">
-          <div>
-            <div class="setting-label">Ollama host</div>
-            <div class="setting-desc">Set via OLLAMA_HOST in docker-compose.yml</div>
-          </div>
+          <div><div class="setting-label">Ollama host</div><div class="setting-desc">Set via OLLAMA_HOST in docker-compose.yml</div></div>
           <div class="setting-control"><span class="tag" id="setting-host">—</span></div>
         </div>
       </div>
@@ -322,10 +339,7 @@
     <!-- Logs -->
     <div class="page" id="page-logs">
       <div class="page-header">
-        <div>
-          <div class="page-title">Logs</div>
-          <div class="page-sub">Last 100 events</div>
-        </div>
+        <div><div class="page-title">Logs</div><div class="page-sub">Last 100 events</div></div>
         <button class="btn btn-ghost" onclick="loadLogs()">&#8635; Refresh</button>
       </div>
       <div id="logs-list" class="log-list"><div class="empty"><div class="empty-icon">&#9645;</div>No logs yet.</div></div>
@@ -337,14 +351,19 @@
 <div id="toast"></div>
 
 <script>
-  // ---- Nav ----
+  // ---- State ----
+  let _accounts = [];
+  let _authUrl = null;
+  let _dragSrcId = null;
+
+  // ---- Navigation ----
   function navigate(page, el) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.getElementById('page-' + page).classList.add('active');
     el.classList.add('active');
     if (page === 'accounts') loadAccounts();
-    if (page === 'prompts') loadPrompts();
+    if (page === 'prompts') { loadAccountSelects(); loadPrompts(); }
     if (page === 'settings') loadSettings();
     if (page === 'logs') loadLogs();
     if (page === 'dashboard') loadDashboard();
@@ -369,6 +388,7 @@
       fetch('/api/status').then(r => r.json()),
       fetch('/api/logs?limit=15').then(r => r.json()),
     ]);
+    _accounts = accounts;
     document.getElementById('stat-accounts').textContent = accounts.length;
     document.getElementById('stat-prompts').textContent = prompts.filter(p => p.active).length;
     document.getElementById('stat-interval').textContent = fmtInterval(settings.poll_interval);
@@ -380,9 +400,9 @@
     }
     renderLogs(logs, 'dashboard-logs');
     const dot = document.getElementById('pollerDot');
-    const label = document.getElementById('pollerLabel');
-    if (status.running) { dot.classList.add('active'); label.textContent = 'running'; }
-    else { dot.classList.remove('active'); label.textContent = 'stopped'; }
+    const lbl = document.getElementById('pollerLabel');
+    if (status.running) { dot.classList.add('active'); lbl.textContent = 'running'; }
+    else { dot.classList.remove('active'); lbl.textContent = 'stopped'; }
   }
 
   function fmtInterval(secs) {
@@ -391,9 +411,24 @@
     return secs + 's';
   }
 
-  // ---- OAuth flow ----
-  let _authUrl = null;
+  // ---- Account selects (shared across pages) ----
+  async function loadAccountSelects() {
+    const accounts = await fetch('/api/accounts').then(r => r.json());
+    _accounts = accounts;
 
+    // Filter dropdown on prompts page
+    const filterSel = document.getElementById('prompt-filter-account');
+    const current = filterSel.value;
+    filterSel.innerHTML = '<option value="">All accounts</option>' +
+      accounts.map(a => `<option value="${a.id}" ${current == a.id ? 'selected' : ''}>${esc(a.email)}</option>`).join('');
+
+    // Account selector in add form
+    const newSel = document.getElementById('new-prompt-account');
+    newSel.innerHTML = '<option value="">All accounts (global)</option>' +
+      accounts.map(a => `<option value="${a.id}">${esc(a.email)}</option>`).join('');
+  }
+
+  // ---- OAuth ----
   function toggleAddAccount() {
     const panel = document.getElementById('add-account-panel');
     panel.classList.toggle('open');
@@ -416,55 +451,41 @@
 
   async function startOAuth() {
     const btn = document.getElementById('btn-gen-url');
-    btn.disabled = true;
-    btn.textContent = 'Generating...';
+    btn.disabled = true; btn.textContent = 'Generating...';
     document.getElementById('oauth-error-box').style.display = 'none';
-
     const r = await fetch('/api/oauth/start', { method: 'POST' });
     const data = await r.json();
-
     if (data.error) {
       document.getElementById('oauth-error-box').textContent = data.error;
       document.getElementById('oauth-error-box').style.display = 'block';
-      btn.disabled = false;
-      btn.textContent = 'Generate Link';
+      btn.disabled = false; btn.textContent = 'Generate Link';
       return;
     }
-
     _authUrl = data.auth_url;
     document.getElementById('auth-url-box').textContent = _authUrl;
     document.getElementById('auth-url-box').classList.add('visible');
     document.getElementById('btn-copy-url').style.display = 'inline-flex';
     document.getElementById('btn-exchange').disabled = false;
     document.getElementById('oauth-step-1').classList.add('done');
-    btn.textContent = 'Regenerate';
-    btn.disabled = false;
+    btn.textContent = 'Regenerate'; btn.disabled = false;
   }
 
   function copyAuthUrl() {
     if (!_authUrl) return;
-    // Use clipboard API if available (HTTPS), otherwise fallback for HTTP/local IP
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(_authUrl).then(() => toast('Link copied to clipboard.'));
     } else {
       const ta = document.createElement('textarea');
       ta.value = _authUrl;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
+      ta.style.position = 'fixed'; ta.style.opacity = '0';
       document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      try {
-        document.execCommand('copy');
-        toast('Link copied to clipboard.');
-      } catch (e) {
-        toast('Copy failed — please select and copy the link manually.', 'error');
-      }
+      ta.focus(); ta.select();
+      try { document.execCommand('copy'); toast('Link copied to clipboard.'); }
+      catch (e) { toast('Copy failed — select and copy the link manually.', 'error'); }
       document.body.removeChild(ta);
     }
   }
 
-  // Enable the connect button once user starts typing
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('oauth-redirect-url').addEventListener('input', function() {
       document.getElementById('btn-exchange').disabled = this.value.trim().length < 10;
@@ -474,38 +495,30 @@
   async function exchangeCode() {
     const url = document.getElementById('oauth-redirect-url').value.trim();
     const btn = document.getElementById('btn-exchange');
-    btn.disabled = true;
-    btn.textContent = 'Connecting...';
+    btn.disabled = true; btn.textContent = 'Connecting...';
     document.getElementById('oauth-error-box').style.display = 'none';
-
     const r = await fetch('/api/oauth/exchange', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url }),
     });
     const data = await r.json();
-
     if (data.error) {
       document.getElementById('oauth-error-box').textContent = data.error;
       document.getElementById('oauth-error-box').style.display = 'block';
-      btn.disabled = false;
-      btn.textContent = 'Connect Account';
+      btn.disabled = false; btn.textContent = 'Connect Account';
       return;
     }
-
     document.getElementById('oauth-success-box').textContent = `Connected: ${data.email}`;
     document.getElementById('oauth-success-box').style.display = 'block';
     btn.textContent = 'Connected!';
     toast(`${data.email} connected.`);
-    setTimeout(() => {
-      toggleAddAccount();
-      loadAccounts();
-    }, 1500);
+    setTimeout(() => { toggleAddAccount(); loadAccounts(); }, 1500);
   }
 
   // ---- Accounts ----
   async function loadAccounts() {
     const accounts = await fetch('/api/accounts').then(r => r.json());
+    _accounts = accounts;
     const el = document.getElementById('accounts-list');
     if (!accounts.length) {
       el.innerHTML = '<div class="empty"><div class="empty-icon">&#9675;</div>No accounts added yet.</div>';
@@ -542,21 +555,44 @@
 
   // ---- Prompts ----
   async function loadPrompts() {
-    const prompts = await fetch('/api/prompts').then(r => r.json());
+    const accountId = document.getElementById('prompt-filter-account')?.value || '';
+    const url = accountId ? `/api/prompts?account_id=${accountId}` : '/api/prompts';
+    const prompts = await fetch(url).then(r => r.json());
     const el = document.getElementById('prompts-list');
+
     if (!prompts.length) {
       el.innerHTML = '<div class="empty"><div class="empty-icon">&#9671;</div>No prompts yet. Add one to start labeling.</div>';
       return;
     }
-    el.innerHTML = prompts.map(p => `
-      <div class="card">
+
+    const accountMap = Object.fromEntries(_accounts.map(a => [a.id, a.email]));
+
+    el.innerHTML = prompts.map(p => {
+      const scope = p.account_id ? `<span class="badge badge-amber" style="margin-left:6px;">${esc(accountMap[p.account_id] || 'account ' + p.account_id)}</span>` : '<span class="badge badge-muted" style="margin-left:6px;">global</span>';
+      const actionBadges = [
+        p.action_archive ? '<span class="badge badge-muted" style="margin-left:6px;">archive</span>' : '',
+        p.action_spam ? '<span class="badge" style="margin-left:6px;background:rgba(239,68,68,0.1);color:var(--red);">spam</span>' : '',
+        p.action_move_to ? `<span class="badge badge-muted" style="margin-left:6px;">move → ${esc(p.action_move_to)}</span>` : '',
+        p.stop_processing ? '<span class="badge badge-stop" style="margin-left:6px;">&#9940; stop</span>' : '',
+      ].join('');
+
+      // Build account options for edit select
+      const accountOptions = '<option value="">All accounts (global)</option>' +
+        _accounts.map(a => `<option value="${a.id}" ${p.account_id == a.id ? 'selected' : ''}>${esc(a.email)}</option>`).join('');
+
+      return `
+      <div class="card" draggable="true" data-id="${p.id}"
+           ondragstart="onDragStart(event)" ondragover="onDragOver(event)"
+           ondragleave="onDragLeave(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)">
         <div class="card-row">
+          <div class="drag-handle" title="Drag to reorder">&#9776;</div>
           <div style="flex:1">
             <div class="card-title">${esc(p.name)}</div>
             <div class="card-meta">Created ${fmtDate(p.created_at)}</div>
             <div style="margin-bottom:10px;">
               <span class="tag">&#9654; ${esc(p.label_name)}</span>
               ${p.active ? '<span class="badge badge-green" style="margin-left:6px;">&#9679; active</span>' : '<span class="badge badge-muted" style="margin-left:6px;">paused</span>'}
+              ${scope}${actionBadges}
             </div>
             <div id="prompt-view-${p.id}" style="font-size:13px;color:var(--muted);line-height:1.6;">${esc(p.instructions)}</div>
             <div id="prompt-edit-${p.id}" style="display:none;margin-top:12px;">
@@ -571,10 +607,29 @@
                 </div>
               </div>
               <div class="form-group">
+                <label>Apply to account</label>
+                <select id="edit-account-${p.id}">${accountOptions}</select>
+              </div>
+              <div class="form-group">
                 <label>Instructions</label>
                 <textarea id="edit-instructions-${p.id}" rows="3">${esc(p.instructions)}</textarea>
               </div>
-              <div style="display:flex;gap:8px;">
+              <div class="form-group">
+                <label>Actions when matched</label>
+                <div class="actions-grid">
+                  <div class="action-item"><input type="checkbox" id="edit-action-archive-${p.id}" ${p.action_archive ? 'checked' : ''} onchange="toggleMoveInput('edit-${p.id}')"><label for="edit-action-archive-${p.id}">Archive</label></div>
+                  <div class="action-item"><input type="checkbox" id="edit-action-spam-${p.id}" ${p.action_spam ? 'checked' : ''}><label for="edit-action-spam-${p.id}">Send to Spam</label></div>
+                  <div class="action-item"><input type="checkbox" id="edit-action-move-${p.id}" ${p.action_move_to ? 'checked' : ''} onchange="toggleMoveInput('edit-${p.id}')"><label for="edit-action-move-${p.id}">Move to Folder</label></div>
+                </div>
+                <div class="action-move-input ${p.action_move_to ? 'visible' : ''}" id="edit-${p.id}-move-input">
+                  <input type="text" id="edit-action-move-to-${p.id}" value="${esc(p.action_move_to || '')}" placeholder="Folder/label name to move to">
+                </div>
+              </div>
+              <div class="stop-processing-row">
+                <input type="checkbox" id="edit-stop-processing-${p.id}" ${p.stop_processing ? 'checked' : ''}>
+                <label for="edit-stop-processing-${p.id}">Stop processing further rules if this one matches</label>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:14px;">
                 <button class="btn btn-primary btn-sm" onclick="savePrompt(${p.id}, ${p.active})">Save</button>
                 <button class="btn btn-ghost btn-sm" onclick="cancelEdit(${p.id})">Cancel</button>
               </div>
@@ -586,11 +641,22 @@
             <button class="btn btn-danger btn-sm" onclick="deletePrompt(${p.id})">Delete</button>
           </div>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   function toggleAddPrompt() {
     document.getElementById('add-prompt-panel').classList.toggle('open');
+  }
+
+  function toggleMoveInput(prefix) {
+    const moveChecked = document.getElementById(prefix + '-action-move')?.checked;
+    const archiveChecked = document.getElementById(prefix + '-action-archive')?.checked;
+    const el = document.getElementById(prefix + '-move-input');
+    if (el) el.classList.toggle('visible', !!moveChecked);
+    if (moveChecked && archiveChecked) {
+      document.getElementById(prefix + '-action-archive').checked = false;
+    }
   }
 
   async function createPrompt() {
@@ -598,14 +664,23 @@
     const instructions = document.getElementById('new-prompt-instructions').value.trim();
     const label_name = document.getElementById('new-prompt-label').value.trim();
     if (!name || !instructions || !label_name) { toast('All fields are required.', 'error'); return; }
+    const account_id = document.getElementById('new-prompt-account').value || null;
+    const action_archive = document.getElementById('new-action-archive').checked ? 1 : 0;
+    const action_spam = document.getElementById('new-action-spam').checked ? 1 : 0;
+    const action_move = document.getElementById('new-action-move').checked;
+    const action_move_to = action_move ? document.getElementById('new-action-move-to').value.trim() : '';
+    const stop_processing = document.getElementById('new-stop-processing').checked ? 1 : 0;
+
     const r = await fetch('/api/prompts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, instructions, label_name }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, instructions, label_name, account_id, action_archive, action_spam, action_move_to, stop_processing }),
     });
     if (r.ok) {
       toast('Rule created.');
-      ['new-prompt-name','new-prompt-instructions','new-prompt-label'].forEach(id => document.getElementById(id).value = '');
+      ['new-prompt-name','new-prompt-instructions','new-prompt-label','new-action-move-to'].forEach(id => document.getElementById(id).value = '');
+      ['new-action-archive','new-action-spam','new-action-move','new-stop-processing'].forEach(id => document.getElementById(id).checked = false);
+      document.getElementById('new-move-input').classList.remove('visible');
+      document.getElementById('new-prompt-account').value = '';
       document.getElementById('add-prompt-panel').classList.remove('open');
       loadPrompts();
     } else {
@@ -628,10 +703,15 @@
     const name = document.getElementById('edit-name-' + id).value.trim();
     const instructions = document.getElementById('edit-instructions-' + id).value.trim();
     const label_name = document.getElementById('edit-label-' + id).value.trim();
+    const account_id = document.getElementById('edit-account-' + id)?.value || null;
+    const action_archive = document.getElementById('edit-action-archive-' + id)?.checked ? 1 : 0;
+    const action_spam = document.getElementById('edit-action-spam-' + id)?.checked ? 1 : 0;
+    const action_move = document.getElementById('edit-action-move-' + id)?.checked;
+    const action_move_to = action_move ? (document.getElementById('edit-action-move-to-' + id)?.value.trim() || '') : '';
+    const stop_processing = document.getElementById('edit-stop-processing-' + id)?.checked ? 1 : 0;
     await fetch(`/api/prompts/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, instructions, label_name, active }),
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, instructions, label_name, active, account_id, action_archive, action_spam, action_move_to, stop_processing }),
     });
     toast('Rule updated.');
     loadPrompts();
@@ -642,9 +722,8 @@
     const p = prompts.find(x => x.id === id);
     if (!p) return;
     await fetch(`/api/prompts/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: p.name, instructions: p.instructions, label_name: p.label_name, active: current ? 0 : 1 }),
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: p.name, instructions: p.instructions, label_name: p.label_name, active: current ? 0 : 1, account_id: p.account_id, action_archive: p.action_archive, action_spam: p.action_spam, action_move_to: p.action_move_to, stop_processing: p.stop_processing }),
     });
     toast(current ? 'Rule paused.' : 'Rule resumed.');
     loadPrompts();
@@ -654,6 +733,55 @@
     if (!confirm('Delete this rule?')) return;
     await fetch(`/api/prompts/${id}`, { method: 'DELETE' });
     toast('Rule deleted.');
+    loadPrompts();
+  }
+
+  // ---- Export ----
+  function exportPrompts() {
+    const accountId = document.getElementById('prompt-filter-account')?.value || '';
+    const account = _accounts.find(a => a.id == accountId);
+    const name = account ? account.email : 'all';
+    const url = accountId
+      ? `/api/prompts/export?account_id=${accountId}&name=${encodeURIComponent(name)}`
+      : `/api/prompts/export?name=all`;
+    window.location.href = url;
+  }
+
+  // ---- Drag to reorder ----
+  function onDragStart(e) {
+    _dragSrcId = parseInt(e.currentTarget.dataset.id);
+    e.currentTarget.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function onDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const card = e.currentTarget;
+    if (parseInt(card.dataset.id) !== _dragSrcId) card.classList.add('drag-over');
+  }
+
+  function onDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+
+  function onDragEnd(e) {
+    document.querySelectorAll('.card').forEach(c => c.classList.remove('dragging', 'drag-over'));
+  }
+
+  async function onDrop(e) {
+    e.preventDefault();
+    const targetId = parseInt(e.currentTarget.dataset.id);
+    e.currentTarget.classList.remove('drag-over');
+    if (!_dragSrcId || _dragSrcId === targetId) return;
+    const cards = [...document.querySelectorAll('#prompts-list .card[data-id]')];
+    const orderedIds = cards.map(c => parseInt(c.dataset.id));
+    const srcIdx = orderedIds.indexOf(_dragSrcId);
+    const tgtIdx = orderedIds.indexOf(targetId);
+    orderedIds.splice(srcIdx, 1);
+    orderedIds.splice(tgtIdx, 0, _dragSrcId);
+    await fetch('/api/prompts/reorder', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ordered_ids: orderedIds }),
+    });
     loadPrompts();
   }
 
@@ -668,8 +796,7 @@
   async function saveSettings() {
     const poll_interval = parseInt(document.getElementById('setting-poll-interval').value, 10);
     const r = await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ poll_interval }),
     });
     if (r.ok) { toast('Settings saved.'); }
@@ -707,13 +834,13 @@
   function esc(str) {
     return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
-
   function fmtDate(str) {
     if (!str) return '—';
     const d = new Date(str.endsWith('Z') ? str : str + 'Z');
     return d.toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
   }
 
+  // ---- Init ----
   loadDashboard();
   setInterval(loadDashboard, 30000);
 </script>

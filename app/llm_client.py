@@ -75,7 +75,6 @@ No explanation, no markdown, just the JSON object."""
 
     raw = response.json().get("message", {}).get("content", "").strip()
 
-    # Strip markdown code fences if the model added them
     if raw.startswith("```"):
         parts = raw.split("```")
         raw = parts[1] if len(parts) > 1 else raw
