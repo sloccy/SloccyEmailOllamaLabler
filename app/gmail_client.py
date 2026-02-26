@@ -66,7 +66,7 @@ def get_or_create_label(service, label_name: str) -> str:
 
 def fetch_recent_emails(service, max_results=5):
     response = service.users().messages().list(
-        userId="me", maxResults=max_results
+        userId="me", maxResults=max_results, q="in:inbox"
     ).execute()
     messages = response.get("messages", [])
     emails = []
