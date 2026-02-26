@@ -33,6 +33,9 @@ services:
       - DATA_DIR=/data
       - CREDENTIALS_FILE=/credentials/credentials.json
       - BASE_URL=http://10.0.0.5:5001
+      # Only process emails received within this many hours (default: 24)
+      # Increase for a longer catch-up window, e.g. 168 = last 7 days
+      - GMAIL_LOOKBACK_HOURS=24
       # How long to wait (seconds) for Ollama to respond / pull a model (default: 600)
       - OLLAMA_TIMEOUT=600
       # LLM context window size in tokens (default: 4096)

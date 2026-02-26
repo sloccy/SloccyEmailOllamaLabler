@@ -6,8 +6,6 @@ from flask import Flask, jsonify, request, render_template, session, Response
 from app import db, gmail_client, poller, llm_client
 
 app = Flask(__name__, template_folder="templates")
-# Secret key is auto-generated on first run and persisted in the DB,
-# so sessions survive container restarts without any manual configuration.
 app.secret_key = "placeholder-replaced-at-startup"
 
 
@@ -205,6 +203,7 @@ def api_get_settings():
         "ollama_num_ctx": int(os.getenv("OLLAMA_NUM_CTX", "4096")),
         "ollama_num_predict": int(os.getenv("OLLAMA_NUM_PREDICT", "200")),
         "gmail_max_results": int(os.getenv("GMAIL_MAX_RESULTS", "50")),
+        "gmail_lookback_hours": int(os.getenv("GMAIL_LOOKBACK_HOURS", "24")),
     })
 
 

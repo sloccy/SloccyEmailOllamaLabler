@@ -7,6 +7,7 @@ from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 
 GMAIL_MAX_RESULTS = int(os.getenv("GMAIL_MAX_RESULTS", "50"))
+GMAIL_LOOKBACK_HOURS = int(os.getenv("GMAIL_LOOKBACK_HOURS", "24"))
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.modify",
@@ -66,9 +67,11 @@ def get_or_create_label(service, label_name: str) -> str:
     return created["id"]
 
 
-def fetch_recent_emails(service, max_results=GMAIL_MAX_RESULTS):
+def fetch_recent_emails(service, max_results=GMAIL_MAX_RESULTS, lookback_hours=GMAIL_LOOKBACK_HOURS):
+    import time
+    after_ts = int(time.time() - lookback_hours * 3600)
     response = service.users().messages().list(
-        userId="me", maxResults=max_results, q="in:inbox"
+        userId="me", maxResults=max_results, q=f"in:inbox after:{after_ts}"
     ).execute()
     messages = response.get("messages", [])
     emails = []
