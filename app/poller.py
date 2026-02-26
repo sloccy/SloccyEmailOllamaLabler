@@ -47,7 +47,6 @@ def _scan_all_accounts():
         return
 
     for account in accounts:
-        # Get prompts that apply to this account (account-specific + global)
         prompts = [p for p in db.list_prompts(account_id=account["id"]) if p["active"]]
         if not prompts:
             db.add_log("INFO", f"[{account['email']}] No active prompts for this account.")
@@ -81,8 +80,6 @@ def _scan_account(account, prompts):
                 label_cache[prompt["label_name"]] = gmail_client.get_or_create_label(
                     service, prompt["label_name"]
                 )
-
-        prompts_by_id = {p["id"]: p for p in prompts}
 
         for email in new_emails:
             try:

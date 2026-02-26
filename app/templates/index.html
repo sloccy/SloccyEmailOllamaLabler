@@ -92,6 +92,8 @@
     .action-item:hover { border-color: var(--muted); }
     .action-item input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--amber); cursor: pointer; }
     .action-item label { font-size: 12.5px; font-weight: 500; cursor: pointer; margin: 0; color: var(--text); }
+    .action-move-input { margin-top: 10px; display: none; }
+    .action-move-input.visible { display: block; }
 
     /* Drag */
     .drag-handle { cursor: grab; color: var(--muted2); font-size: 16px; padding: 0 8px 0 0; flex-shrink: 0; user-select: none; margin-top: 2px; }
@@ -294,7 +296,7 @@
             <div class="action-item"><input type="checkbox" id="new-action-spam"><label for="new-action-spam">Send to Spam</label></div>
             <div class="action-item"><input type="checkbox" id="new-action-trash"><label for="new-action-trash">Trash</label></div>
           </div>
-
+          </div>
         </div>
         <div class="stop-processing-row">
           <input type="checkbox" id="new-stop-processing">
@@ -567,7 +569,7 @@
       const actionBadges = [
         p.action_archive ? '<span class="badge badge-muted" style="margin-left:6px;">archive</span>' : '',
         p.action_spam ? '<span class="badge" style="margin-left:6px;background:rgba(239,68,68,0.1);color:var(--red);">spam</span>' : '',
-        p.action_trash ? '<span class="badge badge-muted" style="margin-left:6px;">trash</span>' : '',
+        p.action_trash ? '<span class="badge badge-muted" style="margin-left:6px;">🗑 trash</span>' : '',
         p.stop_processing ? '<span class="badge badge-stop" style="margin-left:6px;">&#9940; stop</span>' : '',
       ].join('');
 
@@ -615,6 +617,7 @@
                   <div class="action-item"><input type="checkbox" id="edit-action-archive-${p.id}" ${p.action_archive ? 'checked' : ''}><label for="edit-action-archive-${p.id}">Archive</label></div>
                   <div class="action-item"><input type="checkbox" id="edit-action-spam-${p.id}" ${p.action_spam ? 'checked' : ''}><label for="edit-action-spam-${p.id}">Send to Spam</label></div>
                   <div class="action-item"><input type="checkbox" id="edit-action-trash-${p.id}" ${p.action_trash ? 'checked' : ''}><label for="edit-action-trash-${p.id}">Trash</label></div>
+                </div>
               </div>
               <div class="stop-processing-row">
                 <input type="checkbox" id="edit-stop-processing-${p.id}" ${p.stop_processing ? 'checked' : ''}>
@@ -640,7 +643,6 @@
     document.getElementById('add-prompt-panel').classList.toggle('open');
   }
 
-  }
 
   async function createPrompt() {
     const name = document.getElementById('new-prompt-name').value.trim();

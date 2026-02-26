@@ -90,8 +90,6 @@ def api_toggle_account(account_id):
 
 @app.route("/api/prompts", methods=["GET"])
 def api_list_prompts():
-    # Optional filter: ?account_id=1 returns prompts for that account + global prompts
-    # No param returns all prompts (for the management UI)
     account_id = request.args.get("account_id")
     if account_id:
         prompts = db.list_prompts(account_id=int(account_id))
@@ -158,11 +156,6 @@ def api_reorder_prompts():
 
 @app.route("/api/prompts/export", methods=["GET"])
 def api_export_prompts():
-    """
-    Export prompts as a JSON file download.
-    Optional ?account_id=X to export only prompts for that account + globals.
-    Optional ?account_id=X&name=email@example.com to name the file nicely.
-    """
     account_id = request.args.get("account_id")
     account_name = request.args.get("name", "all")
 
@@ -171,12 +164,10 @@ def api_export_prompts():
     else:
         prompts = db.list_prompts()
 
-    # Strip internal DB fields not useful for export
     export_fields = ["name", "instructions", "label_name", "active", "action_archive",
                      "action_spam", "action_trash", "stop_processing", "account_id"]
     export_data = [{k: p[k] for k in export_fields if k in p} for p in prompts]
 
-    # Resolve account_id to email for readability
     accounts = {a["id"]: a["email"] for a in db.list_accounts()}
     for p in export_data:
         aid = p.get("account_id")
@@ -243,6 +234,7 @@ def api_scan_now():
 # ---- Startup ----
 
 def _get_or_create_secret_key() -> str:
+    """Generate a stable secret key on first run and persist it in the DB."""
     key = db.get_setting("flask_secret_key")
     if not key:
         key = secrets.token_hex(32)

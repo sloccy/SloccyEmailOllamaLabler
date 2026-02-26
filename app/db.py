@@ -41,6 +41,7 @@ def init_db():
                 created_at TEXT DEFAULT (datetime('now')),
                 action_archive INTEGER DEFAULT 0,
                 action_spam INTEGER DEFAULT 0,
+                action_move_to TEXT DEFAULT '',
                 action_trash INTEGER DEFAULT 0,
                 sort_order INTEGER DEFAULT 0,
                 stop_processing INTEGER DEFAULT 0,
@@ -76,7 +77,7 @@ def _migrate():
     migrations = [
         "ALTER TABLE prompts ADD COLUMN action_archive INTEGER DEFAULT 0",
         "ALTER TABLE prompts ADD COLUMN action_spam INTEGER DEFAULT 0",
-        "ALTER TABLE prompts ADD COLUMN action_move_to TEXT DEFAULT ''",  # kept for legacy DBs
+        "ALTER TABLE prompts ADD COLUMN action_move_to TEXT DEFAULT ''",
         "ALTER TABLE prompts ADD COLUMN action_trash INTEGER DEFAULT 0",
         "ALTER TABLE prompts ADD COLUMN sort_order INTEGER DEFAULT 0",
         "ALTER TABLE prompts ADD COLUMN stop_processing INTEGER DEFAULT 0",
@@ -209,7 +210,7 @@ def update_prompt(prompt_id, name, instructions, label_name, active,
 def reorder_prompts(ordered_ids: list):
     with get_db() as conn:
         for i, pid in enumerate(ordered_ids):
-            conn.execute("UPDATE prompts SET sort_order=? WHERE id=?", (i, pid))
+            conn.execute("UPDATE prompts SET sort_order=? WHERE id=?\", (i, pid)")
 
 
 def delete_prompt(prompt_id):
