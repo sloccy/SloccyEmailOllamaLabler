@@ -451,23 +451,33 @@
 
   async function startOAuth() {
     const btn = document.getElementById('btn-gen-url');
+    const errBox = document.getElementById('oauth-error-box');
     btn.disabled = true; btn.textContent = 'Generating...';
-    document.getElementById('oauth-error-box').style.display = 'none';
-    const r = await fetch('/api/oauth/start', { method: 'POST' });
-    const data = await r.json();
-    if (data.error) {
-      document.getElementById('oauth-error-box').textContent = data.error;
-      document.getElementById('oauth-error-box').style.display = 'block';
+    errBox.style.display = 'none';
+    try {
+      const r = await fetch('/api/oauth/start', { method: 'POST' });
+      if (!r.ok && r.status !== 500) {
+        throw new Error(`Server returned ${r.status}`);
+      }
+      const data = await r.json();
+      if (data.error) {
+        errBox.textContent = data.error;
+        errBox.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'Generate Link';
+        return;
+      }
+      _authUrl = data.auth_url;
+      document.getElementById('auth-url-box').textContent = _authUrl;
+      document.getElementById('auth-url-box').classList.add('visible');
+      document.getElementById('btn-copy-url').style.display = 'inline-flex';
+      document.getElementById('btn-exchange').disabled = false;
+      document.getElementById('oauth-step-1').classList.add('done');
+      btn.textContent = 'Regenerate'; btn.disabled = false;
+    } catch (e) {
+      errBox.textContent = 'Failed to reach the server: ' + e.message + '. Is the app running?';
+      errBox.style.display = 'block';
       btn.disabled = false; btn.textContent = 'Generate Link';
-      return;
     }
-    _authUrl = data.auth_url;
-    document.getElementById('auth-url-box').textContent = _authUrl;
-    document.getElementById('auth-url-box').classList.add('visible');
-    document.getElementById('btn-copy-url').style.display = 'inline-flex';
-    document.getElementById('btn-exchange').disabled = false;
-    document.getElementById('oauth-step-1').classList.add('done');
-    btn.textContent = 'Regenerate'; btn.disabled = false;
   }
 
   function copyAuthUrl() {
@@ -495,24 +505,31 @@
   async function exchangeCode() {
     const url = document.getElementById('oauth-redirect-url').value.trim();
     const btn = document.getElementById('btn-exchange');
+    const errBox = document.getElementById('oauth-error-box');
     btn.disabled = true; btn.textContent = 'Connecting...';
-    document.getElementById('oauth-error-box').style.display = 'none';
-    const r = await fetch('/api/oauth/exchange', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
-    });
-    const data = await r.json();
-    if (data.error) {
-      document.getElementById('oauth-error-box').textContent = data.error;
-      document.getElementById('oauth-error-box').style.display = 'block';
+    errBox.style.display = 'none';
+    try {
+      const r = await fetch('/api/oauth/exchange', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await r.json();
+      if (data.error) {
+        errBox.textContent = data.error;
+        errBox.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'Connect Account';
+        return;
+      }
+      document.getElementById('oauth-success-box').textContent = `Connected: ${data.email}`;
+      document.getElementById('oauth-success-box').style.display = 'block';
+      btn.textContent = 'Connected!';
+      toast(`${data.email} connected.`);
+      setTimeout(() => { toggleAddAccount(); loadAccounts(); }, 1500);
+    } catch (e) {
+      errBox.textContent = 'Failed to reach the server: ' + e.message;
+      errBox.style.display = 'block';
       btn.disabled = false; btn.textContent = 'Connect Account';
-      return;
     }
-    document.getElementById('oauth-success-box').textContent = `Connected: ${data.email}`;
-    document.getElementById('oauth-success-box').style.display = 'block';
-    btn.textContent = 'Connected!';
-    toast(`${data.email} connected.`);
-    setTimeout(() => { toggleAddAccount(); loadAccounts(); }, 1500);
   }
 
   // ---- Accounts ----

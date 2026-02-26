@@ -5,8 +5,22 @@ from urllib.parse import urlparse, parse_qs
 from flask import Flask, jsonify, request, render_template, session, Response
 from app import db, gmail_client, poller, llm_client
 
+def _get_secret_key():
+    key = os.getenv("FLASK_SECRET_KEY")
+    if key:
+        return key
+    # Persist a stable key in the DB so sessions survive restarts
+    from app import db as _db
+    stored = _db.get_setting("flask_secret_key")
+    if stored:
+        return stored
+    new_key = secrets.token_hex(32)
+    _db.set_setting("flask_secret_key", new_key)
+    return new_key
+
+
 app = Flask(__name__, template_folder="templates")
-app.secret_key = os.getenv("FLASK_SECRET_KEY", secrets.token_hex(32))
+app.secret_key = os.getenv("FLASK_SECRET_KEY", secrets.token_hex(32))  # replaced below after db init
 
 
 # ---- UI ----
@@ -239,6 +253,7 @@ def api_scan_now():
 
 def create_app():
     db.init_db()
+    app.secret_key = _get_secret_key()
     import threading
     threading.Thread(target=llm_client.ensure_model_pulled, daemon=True).start()
     poller.start()
