@@ -112,7 +112,7 @@ def api_create_prompt():
         data["label_name"],
         action_archive=int(data.get("action_archive", 0)),
         action_spam=int(data.get("action_spam", 0)),
-        action_move_to=data.get("action_move_to", "").strip(),
+        action_trash=int(data.get("action_trash", 0)),
         stop_processing=int(data.get("stop_processing", 0)),
         account_id=int(account_id) if account_id else None,
     )
@@ -133,7 +133,7 @@ def api_update_prompt(prompt_id):
         int(data.get("active", 1)),
         action_archive=int(data.get("action_archive", 0)),
         action_spam=int(data.get("action_spam", 0)),
-        action_move_to=data.get("action_move_to", "").strip(),
+        action_trash=int(data.get("action_trash", 0)),
         stop_processing=int(data.get("stop_processing", 0)),
         account_id=int(account_id) if account_id else None,
     )
@@ -173,7 +173,7 @@ def api_export_prompts():
 
     # Strip internal DB fields not useful for export
     export_fields = ["name", "instructions", "label_name", "active", "action_archive",
-                     "action_spam", "action_move_to", "stop_processing", "account_id"]
+                     "action_spam", "action_trash", "stop_processing", "account_id"]
     export_data = [{k: p[k] for k in export_fields if k in p} for p in prompts]
 
     # Resolve account_id to email for readability

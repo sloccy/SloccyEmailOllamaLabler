@@ -92,8 +92,6 @@
     .action-item:hover { border-color: var(--muted); }
     .action-item input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--amber); cursor: pointer; }
     .action-item label { font-size: 12.5px; font-weight: 500; cursor: pointer; margin: 0; color: var(--text); }
-    .action-move-input { margin-top: 10px; display: none; }
-    .action-move-input.visible { display: block; }
 
     /* Drag */
     .drag-handle { cursor: grab; color: var(--muted2); font-size: 16px; padding: 0 8px 0 0; flex-shrink: 0; user-select: none; margin-top: 2px; }
@@ -292,14 +290,11 @@
         <div class="form-group">
           <label>Actions when matched</label>
           <div class="actions-grid">
-            <div class="action-item"><input type="checkbox" id="new-action-archive" onchange="toggleMoveInput('new')"><label for="new-action-archive">Archive</label></div>
+            <div class="action-item"><input type="checkbox" id="new-action-archive"><label for="new-action-archive">Archive</label></div>
             <div class="action-item"><input type="checkbox" id="new-action-spam"><label for="new-action-spam">Send to Spam</label></div>
-            <div class="action-item"><input type="checkbox" id="new-action-move" onchange="toggleMoveInput('new')"><label for="new-action-move">Move to Folder</label></div>
+            <div class="action-item"><input type="checkbox" id="new-action-trash"><label for="new-action-trash">Trash</label></div>
           </div>
-          <div class="action-move-input" id="new-move-input">
-            <input type="text" id="new-action-move-to" placeholder="Folder/label name to move to">
-            <div class="form-hint">Email will be moved out of inbox into this folder.</div>
-          </div>
+
         </div>
         <div class="stop-processing-row">
           <input type="checkbox" id="new-stop-processing">
@@ -451,33 +446,23 @@
 
   async function startOAuth() {
     const btn = document.getElementById('btn-gen-url');
-    const errBox = document.getElementById('oauth-error-box');
     btn.disabled = true; btn.textContent = 'Generating...';
-    errBox.style.display = 'none';
-    try {
-      const r = await fetch('/api/oauth/start', { method: 'POST' });
-      if (!r.ok && r.status !== 500) {
-        throw new Error(`Server returned ${r.status}`);
-      }
-      const data = await r.json();
-      if (data.error) {
-        errBox.textContent = data.error;
-        errBox.style.display = 'block';
-        btn.disabled = false; btn.textContent = 'Generate Link';
-        return;
-      }
-      _authUrl = data.auth_url;
-      document.getElementById('auth-url-box').textContent = _authUrl;
-      document.getElementById('auth-url-box').classList.add('visible');
-      document.getElementById('btn-copy-url').style.display = 'inline-flex';
-      document.getElementById('btn-exchange').disabled = false;
-      document.getElementById('oauth-step-1').classList.add('done');
-      btn.textContent = 'Regenerate'; btn.disabled = false;
-    } catch (e) {
-      errBox.textContent = 'Failed to reach the server: ' + e.message + '. Is the app running?';
-      errBox.style.display = 'block';
+    document.getElementById('oauth-error-box').style.display = 'none';
+    const r = await fetch('/api/oauth/start', { method: 'POST' });
+    const data = await r.json();
+    if (data.error) {
+      document.getElementById('oauth-error-box').textContent = data.error;
+      document.getElementById('oauth-error-box').style.display = 'block';
       btn.disabled = false; btn.textContent = 'Generate Link';
+      return;
     }
+    _authUrl = data.auth_url;
+    document.getElementById('auth-url-box').textContent = _authUrl;
+    document.getElementById('auth-url-box').classList.add('visible');
+    document.getElementById('btn-copy-url').style.display = 'inline-flex';
+    document.getElementById('btn-exchange').disabled = false;
+    document.getElementById('oauth-step-1').classList.add('done');
+    btn.textContent = 'Regenerate'; btn.disabled = false;
   }
 
   function copyAuthUrl() {
@@ -505,31 +490,24 @@
   async function exchangeCode() {
     const url = document.getElementById('oauth-redirect-url').value.trim();
     const btn = document.getElementById('btn-exchange');
-    const errBox = document.getElementById('oauth-error-box');
     btn.disabled = true; btn.textContent = 'Connecting...';
-    errBox.style.display = 'none';
-    try {
-      const r = await fetch('/api/oauth/exchange', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      });
-      const data = await r.json();
-      if (data.error) {
-        errBox.textContent = data.error;
-        errBox.style.display = 'block';
-        btn.disabled = false; btn.textContent = 'Connect Account';
-        return;
-      }
-      document.getElementById('oauth-success-box').textContent = `Connected: ${data.email}`;
-      document.getElementById('oauth-success-box').style.display = 'block';
-      btn.textContent = 'Connected!';
-      toast(`${data.email} connected.`);
-      setTimeout(() => { toggleAddAccount(); loadAccounts(); }, 1500);
-    } catch (e) {
-      errBox.textContent = 'Failed to reach the server: ' + e.message;
-      errBox.style.display = 'block';
+    document.getElementById('oauth-error-box').style.display = 'none';
+    const r = await fetch('/api/oauth/exchange', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const data = await r.json();
+    if (data.error) {
+      document.getElementById('oauth-error-box').textContent = data.error;
+      document.getElementById('oauth-error-box').style.display = 'block';
       btn.disabled = false; btn.textContent = 'Connect Account';
+      return;
     }
+    document.getElementById('oauth-success-box').textContent = `Connected: ${data.email}`;
+    document.getElementById('oauth-success-box').style.display = 'block';
+    btn.textContent = 'Connected!';
+    toast(`${data.email} connected.`);
+    setTimeout(() => { toggleAddAccount(); loadAccounts(); }, 1500);
   }
 
   // ---- Accounts ----
@@ -589,7 +567,7 @@
       const actionBadges = [
         p.action_archive ? '<span class="badge badge-muted" style="margin-left:6px;">archive</span>' : '',
         p.action_spam ? '<span class="badge" style="margin-left:6px;background:rgba(239,68,68,0.1);color:var(--red);">spam</span>' : '',
-        p.action_move_to ? `<span class="badge badge-muted" style="margin-left:6px;">move → ${esc(p.action_move_to)}</span>` : '',
+        p.action_trash ? '<span class="badge badge-muted" style="margin-left:6px;">trash</span>' : '',
         p.stop_processing ? '<span class="badge badge-stop" style="margin-left:6px;">&#9940; stop</span>' : '',
       ].join('');
 
@@ -634,13 +612,9 @@
               <div class="form-group">
                 <label>Actions when matched</label>
                 <div class="actions-grid">
-                  <div class="action-item"><input type="checkbox" id="edit-action-archive-${p.id}" ${p.action_archive ? 'checked' : ''} onchange="toggleMoveInput('edit-${p.id}')"><label for="edit-action-archive-${p.id}">Archive</label></div>
+                  <div class="action-item"><input type="checkbox" id="edit-action-archive-${p.id}" ${p.action_archive ? 'checked' : ''}><label for="edit-action-archive-${p.id}">Archive</label></div>
                   <div class="action-item"><input type="checkbox" id="edit-action-spam-${p.id}" ${p.action_spam ? 'checked' : ''}><label for="edit-action-spam-${p.id}">Send to Spam</label></div>
-                  <div class="action-item"><input type="checkbox" id="edit-action-move-${p.id}" ${p.action_move_to ? 'checked' : ''} onchange="toggleMoveInput('edit-${p.id}')"><label for="edit-action-move-${p.id}">Move to Folder</label></div>
-                </div>
-                <div class="action-move-input ${p.action_move_to ? 'visible' : ''}" id="edit-${p.id}-move-input">
-                  <input type="text" id="edit-action-move-to-${p.id}" value="${esc(p.action_move_to || '')}" placeholder="Folder/label name to move to">
-                </div>
+                  <div class="action-item"><input type="checkbox" id="edit-action-trash-${p.id}" ${p.action_trash ? 'checked' : ''}><label for="edit-action-trash-${p.id}">Trash</label></div>
               </div>
               <div class="stop-processing-row">
                 <input type="checkbox" id="edit-stop-processing-${p.id}" ${p.stop_processing ? 'checked' : ''}>
@@ -666,14 +640,6 @@
     document.getElementById('add-prompt-panel').classList.toggle('open');
   }
 
-  function toggleMoveInput(prefix) {
-    const moveChecked = document.getElementById(prefix + '-action-move')?.checked;
-    const archiveChecked = document.getElementById(prefix + '-action-archive')?.checked;
-    const el = document.getElementById(prefix + '-move-input');
-    if (el) el.classList.toggle('visible', !!moveChecked);
-    if (moveChecked && archiveChecked) {
-      document.getElementById(prefix + '-action-archive').checked = false;
-    }
   }
 
   async function createPrompt() {
@@ -684,19 +650,17 @@
     const account_id = document.getElementById('new-prompt-account').value || null;
     const action_archive = document.getElementById('new-action-archive').checked ? 1 : 0;
     const action_spam = document.getElementById('new-action-spam').checked ? 1 : 0;
-    const action_move = document.getElementById('new-action-move').checked;
-    const action_move_to = action_move ? document.getElementById('new-action-move-to').value.trim() : '';
+    const action_trash = document.getElementById('new-action-trash')?.checked ? 1 : 0;
     const stop_processing = document.getElementById('new-stop-processing').checked ? 1 : 0;
 
     const r = await fetch('/api/prompts', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, instructions, label_name, account_id, action_archive, action_spam, action_move_to, stop_processing }),
+      body: JSON.stringify({ name, instructions, label_name, account_id, action_archive, action_spam, action_trash, stop_processing }),
     });
     if (r.ok) {
       toast('Rule created.');
-      ['new-prompt-name','new-prompt-instructions','new-prompt-label','new-action-move-to'].forEach(id => document.getElementById(id).value = '');
-      ['new-action-archive','new-action-spam','new-action-move','new-stop-processing'].forEach(id => document.getElementById(id).checked = false);
-      document.getElementById('new-move-input').classList.remove('visible');
+      ['new-prompt-name','new-prompt-instructions','new-prompt-label'].forEach(id => document.getElementById(id).value = '');
+      ['new-action-archive','new-action-spam','new-action-trash','new-stop-processing'].forEach(id => document.getElementById(id).checked = false);
       document.getElementById('new-prompt-account').value = '';
       document.getElementById('add-prompt-panel').classList.remove('open');
       loadPrompts();
@@ -723,12 +687,11 @@
     const account_id = document.getElementById('edit-account-' + id)?.value || null;
     const action_archive = document.getElementById('edit-action-archive-' + id)?.checked ? 1 : 0;
     const action_spam = document.getElementById('edit-action-spam-' + id)?.checked ? 1 : 0;
-    const action_move = document.getElementById('edit-action-move-' + id)?.checked;
-    const action_move_to = action_move ? (document.getElementById('edit-action-move-to-' + id)?.value.trim() || '') : '';
+    const action_trash = document.getElementById('edit-action-trash-' + id)?.checked ? 1 : 0;
     const stop_processing = document.getElementById('edit-stop-processing-' + id)?.checked ? 1 : 0;
     await fetch(`/api/prompts/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, instructions, label_name, active, account_id, action_archive, action_spam, action_move_to, stop_processing }),
+      body: JSON.stringify({ name, instructions, label_name, active, account_id, action_archive, action_spam, action_trash, stop_processing }),
     });
     toast('Rule updated.');
     loadPrompts();
@@ -740,7 +703,7 @@
     if (!p) return;
     await fetch(`/api/prompts/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: p.name, instructions: p.instructions, label_name: p.label_name, active: current ? 0 : 1, account_id: p.account_id, action_archive: p.action_archive, action_spam: p.action_spam, action_move_to: p.action_move_to, stop_processing: p.stop_processing }),
+      body: JSON.stringify({ name: p.name, instructions: p.instructions, label_name: p.label_name, active: current ? 0 : 1, account_id: p.account_id, action_archive: p.action_archive, action_spam: p.action_spam, action_trash: p.action_trash, stop_processing: p.stop_processing }),
     });
     toast(current ? 'Rule paused.' : 'Rule resumed.');
     loadPrompts();

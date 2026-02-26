@@ -81,9 +81,6 @@ def _scan_account(account, prompts):
                 label_cache[prompt["label_name"]] = gmail_client.get_or_create_label(
                     service, prompt["label_name"]
                 )
-            move_to = prompt.get("action_move_to", "").strip()
-            if move_to and move_to not in label_cache:
-                label_cache[move_to] = gmail_client.get_or_create_label(service, move_to)
 
         prompts_by_id = {p["id"]: p for p in prompts}
 
@@ -105,14 +102,12 @@ def _scan_account(account, prompts):
                         if prompt.get("action_spam"):
                             gmail_client.spam_email(service, email["id"])
                             actions_taken.append("sent to spam")
+                        elif prompt.get("action_trash"):
+                            gmail_client.trash_email(service, email["id"])
+                            actions_taken.append("trashed")
                         elif prompt.get("action_archive"):
                             gmail_client.archive_email(service, email["id"])
                             actions_taken.append("archived")
-
-                        move_to = prompt.get("action_move_to", "").strip()
-                        if move_to and not prompt.get("action_spam"):
-                            gmail_client.move_to_folder(service, email["id"], label_cache[move_to])
-                            actions_taken.append(f"moved to {move_to}")
 
                         if prompt.get("stop_processing"):
                             actions_taken.append("stopped further rules")
