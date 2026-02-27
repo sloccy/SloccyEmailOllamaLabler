@@ -537,14 +537,16 @@
   }
 
   async function toggleAccount(id, current) {
-    await fetch(`/api/accounts/${id}/toggle`, { method: 'POST' });
+    const r = await fetch(`/api/accounts/${id}/toggle`, { method: 'POST' });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); toast(e.error || 'Error', 'error'); return; }
     toast(current ? 'Account paused.' : 'Account resumed.');
     loadAccounts();
   }
 
   async function deleteAccount(id) {
     if (!confirm('Remove this account? Its processed email history will also be cleared.')) return;
-    await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
+    const r = await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); toast(e.error || 'Error', 'error'); return; }
     toast('Account removed.');
     loadAccounts();
   }
@@ -690,10 +692,11 @@
     const action_spam = document.getElementById('edit-action-spam-' + id)?.checked ? 1 : 0;
     const action_trash = document.getElementById('edit-action-trash-' + id)?.checked ? 1 : 0;
     const stop_processing = document.getElementById('edit-stop-processing-' + id)?.checked ? 1 : 0;
-    await fetch(`/api/prompts/${id}`, {
+    const r = await fetch(`/api/prompts/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, instructions, label_name, active, account_id, action_archive, action_spam, action_trash, stop_processing }),
     });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); toast(e.error || 'Error', 'error'); return; }
     toast('Rule updated.');
     loadPrompts();
   }
@@ -702,17 +705,19 @@
     const prompts = await fetch('/api/prompts').then(r => r.json());
     const p = prompts.find(x => x.id === id);
     if (!p) return;
-    await fetch(`/api/prompts/${id}`, {
+    const r = await fetch(`/api/prompts/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: p.name, instructions: p.instructions, label_name: p.label_name, active: current ? 0 : 1, account_id: p.account_id, action_archive: p.action_archive, action_spam: p.action_spam, action_trash: p.action_trash, stop_processing: p.stop_processing }),
     });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); toast(e.error || 'Error', 'error'); return; }
     toast(current ? 'Rule paused.' : 'Rule resumed.');
     loadPrompts();
   }
 
   async function deletePrompt(id) {
     if (!confirm('Delete this rule?')) return;
-    await fetch(`/api/prompts/${id}`, { method: 'DELETE' });
+    const r = await fetch(`/api/prompts/${id}`, { method: 'DELETE' });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); toast(e.error || 'Error', 'error'); return; }
     toast('Rule deleted.');
     loadPrompts();
   }
@@ -806,7 +811,8 @@
 
   // ---- Scan now ----
   async function scanNow() {
-    await fetch('/api/scan', { method: 'POST' });
+    const r = await fetch('/api/scan', { method: 'POST' });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); toast(e.error || 'Error', 'error'); return; }
     toast('Scan triggered. Check logs for results.');
     setTimeout(loadDashboard, 2000);
   }
