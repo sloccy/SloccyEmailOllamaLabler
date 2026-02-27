@@ -2,12 +2,7 @@ import os
 import json
 import requests
 from app import db
-
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
-OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "600"))
-OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "4096"))
-OLLAMA_NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "200"))
+from app.config import OLLAMA_HOST, OLLAMA_MODEL, OLLAMA_TIMEOUT, OLLAMA_NUM_CTX, OLLAMA_NUM_PREDICT
 
 
 def ensure_model_pulled():
@@ -56,46 +51,57 @@ Respond with ONLY a JSON object where each key is the rule id number and the val
 Example: {{"1": true, "2": false}}
 No explanation, no markdown, just the JSON object."""
 
-    response = requests.post(
-        f"{OLLAMA_HOST}/api/chat",
-        json={
-            "model": OLLAMA_MODEL,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are an email classification assistant. Respond only with a JSON object mapping rule IDs to true/false. No explanation, no markdown.",
-                },
-                {"role": "user", "content": prompt},
-            ],
-            "stream": False,
-            "think": False,
-            "format": "json",
-            "options": {
-                "temperature": 0,
-                "num_predict": OLLAMA_NUM_PREDICT,
-                "num_ctx": OLLAMA_NUM_CTX,
-            },
-        },
-        timeout=OLLAMA_TIMEOUT,
-    )
-    response.raise_for_status()
-
-    raw = response.json().get("message", {}).get("content", "").strip()
-
-    if raw.startswith("```"):
-        parts = raw.split("```")
-        raw = parts[1] if len(parts) > 1 else raw
-        if raw.startswith("json"):
-            raw = raw[4:]
-        raw = raw.strip()
-
     try:
-        result = json.loads(raw)
-        parsed = {int(k): bool(v) for k, v in result.items()}
-        db.add_log("DEBUG", f"LLM raw response: {raw}")
-        db.add_log("DEBUG", f"LLM parsed: { {p['name']: parsed.get(p['id'], False) for p in prompts} }")
-        return parsed
+        response = requests.post(
+            f"{OLLAMA_HOST}/api/chat",
+            json={
+                "model": OLLAMA_MODEL,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You are an email classification assistant. Respond only with a JSON object mapping rule IDs to true/false. No explanation, no markdown.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                "stream": False,
+                "think": False,
+                "format": "json",
+                "options": {
+                    "temperature": 0,
+                    "num_predict": OLLAMA_NUM_PREDICT,
+                    "num_ctx": OLLAMA_NUM_CTX,
+                },
+            },
+            timeout=OLLAMA_TIMEOUT,
+        )
+        response.raise_for_status()
+
+        raw = response.json().get("message", {}).get("content", "").strip()
+
+        if raw.startswith("```"):
+            parts = raw.split("```")
+            raw = parts[1] if len(parts) > 1 else raw
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
+
+        try:
+            result = json.loads(raw)
+            parsed = {int(k): bool(v) for k, v in result.items()}
+            db.add_log("DEBUG", f"LLM raw response: {raw}")
+            db.add_log("DEBUG", f"LLM parsed: { {p['name']: parsed.get(p['id'], False) for p in prompts} }")
+            return parsed
+        except Exception as e:
+            db.add_log("ERROR", f"LLM parse error: {e!r} | raw: {raw!r}")
+            print(f"Warning: could not parse LLM batch response: {e!r} | raw: {raw!r}")
+            return {p["id"]: False for p in prompts}
+    except requests.exceptions.RequestException as e:
+        db.add_log("ERROR", f"LLM request failed: {e!r}")
+        print(f"Warning: LLM request failed: {e!r}")
+        # Return default values to avoid stopping the entire process
+        return {p["id"]: False for p in prompts}
     except Exception as e:
-        db.add_log("ERROR", f"LLM parse error: {e!r} | raw: {raw!r}")
-        print(f"Warning: could not parse LLM batch response: {e!r} | raw: {raw!r}")
+        db.add_log("ERROR", f"LLM unexpected error: {e!r}")
+        print(f"Warning: LLM unexpected error: {e!r}")
+        # Return default values to avoid stopping the entire process
         return {p["id"]: False for p in prompts}

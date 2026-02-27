@@ -1,6 +1,7 @@
 import time
 import threading
 from app import db, gmail_client, llm_client
+from app.config import GMAIL_MAX_RESULTS, GMAIL_LOOKBACK_HOURS, POLL_INTERVAL
 
 _stop_event = threading.Event()
 _thread = None
@@ -32,7 +33,7 @@ def _loop():
     _status["running"] = True
     while not _stop_event.is_set():
         _scan_all_accounts()
-        interval = int(db.get_setting("poll_interval", "300"))
+        interval = POLL_INTERVAL
         _status["next_run"] = time.time() + interval
         _stop_event.wait(timeout=interval)
     _status["running"] = False
@@ -63,7 +64,7 @@ def _scan_account(account, prompts):
         if refreshed_creds != account["credentials_json"]:
             db.update_account_credentials(account_id, refreshed_creds)
 
-        emails = gmail_client.fetch_recent_emails(service)
+        emails = gmail_client.fetch_recent_emails(service, max_results=GMAIL_MAX_RESULTS, lookback_hours=GMAIL_LOOKBACK_HOURS)
         new_emails = [e for e in emails if not db.is_processed(account_id, e["id"])]
 
         if not new_emails:

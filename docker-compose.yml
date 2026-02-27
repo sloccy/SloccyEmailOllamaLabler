@@ -47,6 +47,9 @@ services:
       # How many emails to fetch per inbox scan (default: 50)
       # Only unprocessed emails are classified, so higher values are safe
       - GMAIL_MAX_RESULTS=10
+      # Log retention period in days (default: 30)
+      # Set to 0 to keep logs forever
+      - LOG_RETENTION_DAYS=30
 
     depends_on:
       - ollama

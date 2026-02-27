@@ -252,10 +252,17 @@ def add_log(level, message):
         conn.execute(
             "INSERT INTO logs (level, message) VALUES (?, ?)", (level.upper(), message)
         )
-    with get_db() as conn:
-        conn.execute(
-            "DELETE FROM logs WHERE id NOT IN (SELECT id FROM logs ORDER BY id DESC LIMIT 500)"
-        )
+    # Get log retention period from settings (default 30 days)
+    retention_days = int(get_setting("log_retention_days", "30"))
+    if retention_days > 0:
+        # Calculate timestamp for cutoff
+        import time
+        cutoff_timestamp = time.time() - (retention_days * 24 * 60 * 60)
+        with get_db() as conn:
+            conn.execute(
+                "DELETE FROM logs WHERE timestamp < datetime(?, 'unixepoch')",
+                (cutoff_timestamp,)
+            )
 
 
 def get_logs(limit=100):
