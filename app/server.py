@@ -4,6 +4,7 @@ import secrets
 from urllib.parse import urlparse, parse_qs
 from flask import Flask, jsonify, request, render_template, session, Response
 from app import db, gmail_client, poller, llm_client
+from app.config import POLL_INTERVAL
 
 app = Flask(__name__, template_folder="templates")
 app.secret_key = "placeholder-replaced-at-startup"
@@ -34,6 +35,8 @@ def oauth_start():
 @app.route("/api/oauth/exchange", methods=["POST"])
 def oauth_exchange():
     data = request.json
+    if data is None:
+        return jsonify({"error": "JSON body required."}), 400
     pasted_url = data.get("url", "").strip()
     if not pasted_url:
         return jsonify({"error": "No URL provided."}), 400
@@ -101,6 +104,8 @@ def api_list_prompts():
 @app.route("/api/prompts", methods=["POST"])
 def api_create_prompt():
     data = request.json
+    if data is None:
+        return jsonify({"error": "JSON body required."}), 400
     if not data.get("name") or not data.get("instructions") or not data.get("label_name"):
         return jsonify({"error": "name, instructions, and label_name are required"}), 400
     account_id = data.get("account_id")
@@ -122,6 +127,8 @@ def api_create_prompt():
 @app.route("/api/prompts/<int:prompt_id>", methods=["PUT"])
 def api_update_prompt(prompt_id):
     data = request.json
+    if data is None:
+        return jsonify({"error": "JSON body required."}), 400
     account_id = data.get("account_id")
     db.update_prompt(
         prompt_id,
@@ -147,6 +154,8 @@ def api_delete_prompt(prompt_id):
 @app.route("/api/prompts/reorder", methods=["POST"])
 def api_reorder_prompts():
     data = request.json
+    if data is None:
+        return jsonify({"error": "JSON body required."}), 400
     ordered_ids = data.get("ordered_ids", [])
     if not ordered_ids:
         return jsonify({"error": "ordered_ids required"}), 400
@@ -187,7 +196,7 @@ def api_export_prompts():
 @app.route("/api/settings", methods=["GET"])
 def api_get_settings():
     return jsonify({
-        "poll_interval": int(db.get_setting("poll_interval", "300")),
+        "poll_interval": int(db.get_setting("poll_interval", str(POLL_INTERVAL))),
         "ollama_model": os.getenv("OLLAMA_MODEL", "llama3.2"),
         "ollama_host": os.getenv("OLLAMA_HOST", "http://localhost:11434"),
         "ollama_timeout": int(os.getenv("OLLAMA_TIMEOUT", "600")),
@@ -201,12 +210,14 @@ def api_get_settings():
 @app.route("/api/settings", methods=["POST"])
 def api_update_settings():
     data = request.json
+    if data is None:
+        return jsonify({"error": "JSON body required."}), 400
     if "poll_interval" in data:
         val = int(data["poll_interval"])
         if val < 30:
             return jsonify({"error": "Minimum poll interval is 30 seconds"}), 400
         db.set_setting("poll_interval", str(val))
-    db.add_log("INFO", f"Settings updated: poll_interval={data.get('poll_interval')}s")
+        db.add_log("INFO", f"Settings updated: poll_interval={val}s")
     return jsonify({"ok": True})
 
 
