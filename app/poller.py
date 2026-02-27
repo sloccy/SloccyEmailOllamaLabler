@@ -81,18 +81,32 @@ def _scan_account(account, prompts):
                     service, prompt["label_name"]
                 )
 
-        for email in new_emails:
+        # Process emails one-by-one to respect Ollama concurrency limits
+        # (Ollama may only allow 2 concurrent requests)
+        for i, email in enumerate(new_emails):
             try:
-                results = llm_client.classify_email_batch(email, prompts)
+                # Get results for this single email
+                batch_results = llm_client.classify_email_batch([email], prompts)
+                
+                # Process the single email result
+                email_index = 1  # LLM uses 1-based indexing
+                email_results = batch_results.get(email_index, {})
+                
                 stop = False
-
+                
                 for prompt in prompts:
                     if stop:
                         break
                     prompt_id = prompt["id"]
-                    should_label = results.get(prompt_id, False)
+                    should_label = email_results.get(prompt_id, False)
 
                     if should_label:
+                        # Use cached label ID if available, otherwise fetch/create it
+                        if prompt["label_name"] not in label_cache:
+                            label_cache[prompt["label_name"]] = gmail_client.get_or_create_label(
+                                service, prompt["label_name"]
+                            )
+                        
                         gmail_client.apply_label(service, email["id"], label_cache[prompt["label_name"]])
                         actions_taken = [f"labeled → {prompt['label_name']}"]
 
@@ -121,8 +135,9 @@ def _scan_account(account, prompts):
                         )
 
             except Exception as e:
-                db.add_log("ERROR", f"[{email_addr}] Error processing '{email['subject'][:60]}': {e}")
+                db.add_log("ERROR", f"[{email_addr}] Error processing email: {e}")
 
+            # Mark the email as processed
             db.mark_processed(account_id, email["id"])
 
         db.update_last_scan(account_id)

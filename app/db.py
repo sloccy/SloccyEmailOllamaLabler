@@ -67,6 +67,14 @@ def init_db():
                 message TEXT NOT NULL
             );
 
+            -- Create indexes for better performance
+            CREATE INDEX IF NOT EXISTS idx_processed_emails_account_id ON processed_emails(account_id);
+            CREATE INDEX IF NOT EXISTS idx_processed_emails_message_id ON processed_emails(message_id);
+            CREATE INDEX IF NOT EXISTS idx_accounts_active ON accounts(active);
+            CREATE INDEX IF NOT EXISTS idx_prompts_active ON prompts(active);
+            CREATE INDEX IF NOT EXISTS idx_prompts_account_id ON prompts(account_id);
+            CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
+
             INSERT OR IGNORE INTO settings (key, value) VALUES ('poll_interval', '300');
         """)
     _migrate()
@@ -210,7 +218,7 @@ def update_prompt(prompt_id, name, instructions, label_name, active,
 def reorder_prompts(ordered_ids: list):
     with get_db() as conn:
         for i, pid in enumerate(ordered_ids):
-            conn.execute("UPDATE prompts SET sort_order=? WHERE id=?\", (i, pid)")
+            conn.execute("UPDATE prompts SET sort_order=? WHERE id=?", (i, pid))
 
 
 def delete_prompt(prompt_id):
