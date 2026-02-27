@@ -1,9 +1,11 @@
+import json
 import time
 import threading
 from app import db, gmail_client, llm_client
 from app.config import GMAIL_MAX_RESULTS, GMAIL_LOOKBACK_HOURS, POLL_INTERVAL
 
 _stop_event = threading.Event()
+_scan_lock = threading.Lock()
 _thread = None
 _status = {"running": False, "last_run": None, "next_run": None}
 
@@ -33,14 +35,25 @@ def _loop():
     _status["running"] = True
     while not _stop_event.is_set():
         _scan_all_accounts()
-        interval = POLL_INTERVAL
+        interval = int(db.get_setting("poll_interval", str(POLL_INTERVAL)))
         _status["next_run"] = time.time() + interval
         _stop_event.wait(timeout=interval)
     _status["running"] = False
 
 
 def _scan_all_accounts():
+    if not _scan_lock.acquire(blocking=False):
+        db.add_log("INFO", "Scan already in progress, skipping.")
+        return
+    try:
+        _run_scan()
+    finally:
+        _scan_lock.release()
+
+
+def _run_scan():
     _status["last_run"] = time.time()
+    db.trim_logs()
     accounts = [a for a in db.list_accounts() if a["active"]]
 
     if not accounts:
@@ -61,7 +74,7 @@ def _scan_account(account, prompts):
     email_addr = account["email"]
     try:
         service, refreshed_creds = gmail_client.get_service(account["credentials_json"])
-        if refreshed_creds != account["credentials_json"]:
+        if json.loads(refreshed_creds) != json.loads(account["credentials_json"]):
             db.update_account_credentials(account_id, refreshed_creds)
 
         emails = gmail_client.fetch_recent_emails(service, max_results=GMAIL_MAX_RESULTS, lookback_hours=GMAIL_LOOKBACK_HOURS)
@@ -74,13 +87,9 @@ def _scan_account(account, prompts):
 
         db.add_log("INFO", f"[{email_addr}] Processing {len(new_emails)} new email(s) against {len(prompts)} rule(s).")
 
-        # Pre-fetch/create all label IDs up front
-        label_cache = {}
-        for prompt in prompts:
-            if prompt["label_name"] not in label_cache:
-                label_cache[prompt["label_name"]] = gmail_client.get_or_create_label(
-                    service, prompt["label_name"]
-                )
+        # Fetch/create all label IDs with a single Gmail API call
+        unique_labels = list({p["label_name"] for p in prompts})
+        label_cache = gmail_client.build_label_cache(service, unique_labels)
 
         # Process emails one-by-one to respect Ollama concurrency limits
         # (Ollama may only allow 2 concurrent requests)
@@ -98,12 +107,6 @@ def _scan_account(account, prompts):
                     should_label = email_results.get(prompt_id, False)
 
                     if should_label:
-                        # Use cached label ID if available, otherwise fetch/create it
-                        if prompt["label_name"] not in label_cache:
-                            label_cache[prompt["label_name"]] = gmail_client.get_or_create_label(
-                                service, prompt["label_name"]
-                            )
-                        
                         gmail_client.apply_label(service, email["id"], label_cache[prompt["label_name"]])
                         actions_taken = [f"labeled → {prompt['label_name']}"]
 
@@ -131,11 +134,9 @@ def _scan_account(account, prompts):
                             f"[{email_addr}] Skipped '{email['subject'][:60]}' for rule: {prompt['name']}",
                         )
 
+                db.mark_processed(account_id, email["id"])
             except Exception as e:
                 db.add_log("ERROR", f"[{email_addr}] Error processing email: {e}")
-
-            # Mark the email as processed
-            db.mark_processed(account_id, email["id"])
 
         db.update_last_scan(account_id)
 

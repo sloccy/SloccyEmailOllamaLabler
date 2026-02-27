@@ -1,6 +1,8 @@
 import sqlite3
 import os
+import time
 from contextlib import contextmanager
+from app.config import LOG_RETENTION_DAYS, POLL_INTERVAL
 
 DB_PATH = os.path.join(os.getenv("DATA_DIR", "/data"), "labeler.db")
 
@@ -75,8 +77,12 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_prompts_account_id ON prompts(account_id);
             CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
 
-            INSERT OR IGNORE INTO settings (key, value) VALUES ('poll_interval', '300');
         """)
+    with get_db() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO settings (key, value) VALUES ('poll_interval', ?)",
+            (str(POLL_INTERVAL),),
+        )
     _migrate()
 
 
@@ -252,11 +258,11 @@ def add_log(level, message):
         conn.execute(
             "INSERT INTO logs (level, message) VALUES (?, ?)", (level.upper(), message)
         )
-    # Get log retention period from settings (default 30 days)
-    retention_days = int(get_setting("log_retention_days", "30"))
+
+
+def trim_logs():
+    retention_days = int(get_setting("log_retention_days", str(LOG_RETENTION_DAYS)))
     if retention_days > 0:
-        # Calculate timestamp for cutoff
-        import time
         cutoff_timestamp = time.time() - (retention_days * 24 * 60 * 60)
         with get_db() as conn:
             conn.execute(

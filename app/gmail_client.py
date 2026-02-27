@@ -6,9 +6,7 @@ from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
-
-GMAIL_MAX_RESULTS = int(os.getenv("GMAIL_MAX_RESULTS", "50"))
-GMAIL_LOOKBACK_HOURS = int(os.getenv("GMAIL_LOOKBACK_HOURS", "24"))
+from app.config import GMAIL_MAX_RESULTS, GMAIL_LOOKBACK_HOURS
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.modify",
@@ -66,6 +64,27 @@ def get_or_create_label(service, label_name: str) -> str:
         },
     ).execute()
     return created["id"]
+
+
+def build_label_cache(service, label_names: list) -> dict:
+    """Fetch the Gmail label list once, create any missing labels, return {name: id}."""
+    result = service.users().labels().list(userId="me").execute()
+    existing = {l["name"].lower(): l["id"] for l in result.get("labels", [])}
+    cache = {}
+    for name in label_names:
+        if name.lower() in existing:
+            cache[name] = existing[name.lower()]
+        else:
+            created = service.users().labels().create(
+                userId="me",
+                body={
+                    "name": name,
+                    "labelListVisibility": "labelShow",
+                    "messageListVisibility": "show",
+                },
+            ).execute()
+            cache[name] = created["id"]
+    return cache
 
 
 def fetch_recent_emails(service, max_results=GMAIL_MAX_RESULTS, lookback_hours=GMAIL_LOOKBACK_HOURS):
