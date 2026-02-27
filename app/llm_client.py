@@ -36,6 +36,7 @@ def classify_email_batch(email: dict, prompts: list) -> dict:
         for i, p in enumerate(prompts)
     )
 
+    example = ", ".join(f'"{p["id"]}": false' for p in prompts[:2])
     prompt = f"""You are an email classification assistant. You will be given an email and a list of labeling rules. For each rule, decide if the label should be applied to this email.
 
 Rules:
@@ -47,8 +48,8 @@ Subject: {email['subject']}
 Body:
 {email['body'] or email['snippet']}
 
-Respond with ONLY a JSON object where each key is the rule id number and the value is true or false.
-Example: {{"1": true, "2": false}}
+Respond with ONLY a JSON object where each key is the rule's [id] number and the value is true or false.
+Example: {{{example}}}
 No explanation, no markdown, just the JSON object."""
 
     try:

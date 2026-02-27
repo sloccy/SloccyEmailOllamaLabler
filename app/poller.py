@@ -84,17 +84,13 @@ def _scan_account(account, prompts):
 
         # Process emails one-by-one to respect Ollama concurrency limits
         # (Ollama may only allow 2 concurrent requests)
-        for i, email in enumerate(new_emails):
+        for email in new_emails:
             try:
                 # Get results for this single email
-                batch_results = llm_client.classify_email_batch([email], prompts)
-                
-                # Process the single email result
-                email_index = 1  # LLM uses 1-based indexing
-                email_results = batch_results.get(email_index, {})
-                
+                email_results = llm_client.classify_email_batch(email, prompts)
+
                 stop = False
-                
+
                 for prompt in prompts:
                     if stop:
                         break
