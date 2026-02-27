@@ -242,6 +242,24 @@ def api_scan_now():
     return jsonify({"ok": True})
 
 
+# ---- Prompt Builder ----
+
+@app.route("/api/prompts/generate", methods=["POST"])
+def api_generate_prompt():
+    data = request.json
+    if data is None:
+        return jsonify({"error": "JSON body required."}), 400
+    description = data.get("description", "").strip()
+    if not description:
+        return jsonify({"error": "description is required"}), 400
+    try:
+        instruction = llm_client.generate_prompt_instruction(description)
+        return jsonify({"instruction": instruction})
+    except Exception as e:
+        db.add_log("ERROR", f"Prompt generation failed: {e}")
+        return jsonify({"error": "Generation failed. Check Ollama is running."}), 500
+
+
 # ---- Startup ----
 
 def _get_or_create_secret_key() -> str:

@@ -173,6 +173,7 @@
       <div class="nav-item active" data-page="dashboard" onclick="navigate('dashboard', this)"><span class="nav-icon">&#9632;</span> Dashboard</div>
       <div class="nav-item" data-page="accounts" onclick="navigate('accounts', this)"><span class="nav-icon">&#9675;</span> Accounts</div>
       <div class="nav-item" data-page="prompts" onclick="navigate('prompts', this)"><span class="nav-icon">&#9671;</span> Prompts</div>
+      <div class="nav-item" data-page="builder" onclick="navigate('builder', this)"><span class="nav-icon">&#9670;</span> Builder</div>
       <div class="nav-item" data-page="settings" onclick="navigate('settings', this)"><span class="nav-icon">&#9633;</span> Settings</div>
       <div class="nav-item" data-page="logs" onclick="navigate('logs', this)"><span class="nav-icon">&#9645;</span> Logs</div>
     </nav>
@@ -310,6 +311,30 @@
       <div id="prompts-list"><div class="empty"><div class="empty-icon">&#9671;</div>No prompts yet. Add one to start labeling.</div></div>
     </div>
 
+    <!-- Builder -->
+    <div class="page" id="page-builder">
+      <div class="page-header">
+        <div><div class="page-title">Prompt Builder</div><div class="page-sub">Describe what to filter — AI drafts the rule instruction</div></div>
+      </div>
+      <div style="max-width:600px;">
+        <div class="form-group">
+          <label>Describe the emails you want to label</label>
+          <textarea id="builder-description" rows="4" placeholder="e.g. Promotional emails and newsletters from online stores that I didn't explicitly sign up for..."></textarea>
+        </div>
+        <button class="btn btn-primary" id="btn-generate" onclick="generatePrompt()">&#9670; Generate Instruction</button>
+
+        <div id="builder-result" style="display:none;margin-top:28px;">
+          <hr class="divider">
+          <div class="form-title">Generated instruction</div>
+          <div class="form-group">
+            <textarea id="builder-instruction" rows="5"></textarea>
+            <div class="form-hint">Edit if needed, then send it to the Prompts page.</div>
+          </div>
+          <button class="btn btn-ghost" onclick="useBuilderInstruction()">&#8599; Use this prompt</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Settings -->
     <div class="page" id="page-settings">
       <div class="page-header">
@@ -360,6 +385,7 @@
     el.classList.add('active');
     if (page === 'accounts') loadAccounts();
     if (page === 'prompts') { loadAccountSelects(); loadPrompts(); }
+    if (page === 'builder') {}
     if (page === 'settings') loadSettings();
     if (page === 'logs') loadLogs();
     if (page === 'dashboard') loadDashboard();
@@ -807,6 +833,38 @@
         <span class="log-level ${l.level}">${l.level}</span>
         <span class="log-msg">${esc(l.message)}</span>
       </div>`).join('');
+  }
+
+  // ---- Builder ----
+  async function generatePrompt() {
+    const description = document.getElementById('builder-description').value.trim();
+    if (!description) { toast('Describe the emails first.', 'error'); return; }
+    const btn = document.getElementById('btn-generate');
+    btn.disabled = true; btn.textContent = 'Generating...';
+    document.getElementById('builder-result').style.display = 'none';
+    try {
+      const r = await fetch('/api/prompts/generate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description }),
+      });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); toast(e.error || 'Generation failed.', 'error'); return; }
+      const data = await r.json();
+      document.getElementById('builder-instruction').value = data.instruction;
+      document.getElementById('builder-result').style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.textContent = '◆ Generate Instruction';
+    }
+  }
+
+  function useBuilderInstruction() {
+    const instruction = document.getElementById('builder-instruction').value.trim();
+    if (!instruction) return;
+    const promptsNav = document.querySelector('.nav-item[data-page="prompts"]');
+    navigate('prompts', promptsNav);
+    const panel = document.getElementById('add-prompt-panel');
+    if (!panel.classList.contains('open')) panel.classList.add('open');
+    document.getElementById('new-prompt-instructions').value = instruction;
+    document.getElementById('new-prompt-instructions').scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   // ---- Scan now ----

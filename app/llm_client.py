@@ -106,3 +106,42 @@ No explanation, no markdown, just the JSON object."""
         print(f"Warning: LLM unexpected error: {e!r}")
         # Return default values to avoid stopping the entire process
         return {p["id"]: False for p in prompts}
+
+
+def generate_prompt_instruction(description: str) -> str:
+    """
+    Given a plain-language description of emails to filter,
+    returns a well-worded classifier instruction via Ollama.
+    Raises on failure so the caller can surface the error to the user.
+    """
+    prompt = f"""A user wants to automatically label certain emails in Gmail. They described what they want to catch:
+
+"{description}"
+
+Write a clear, specific instruction (2-4 sentences) that an AI email classifier can use to decide whether to apply a label to an email. Cover content, sender patterns, subject patterns, and context clues where relevant. Be precise so the classifier doesn't over- or under-match.
+
+Respond with ONLY the instruction text. No preamble, no quotes, no explanation."""
+
+    response = requests.post(
+        f"{OLLAMA_HOST}/api/chat",
+        json={
+            "model": OLLAMA_MODEL,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You write precise email filter instructions. Output only the instruction, nothing else.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            "stream": False,
+            "think": False,
+            "options": {
+                "temperature": 0.7,
+                "num_predict": 300,
+                "num_ctx": OLLAMA_NUM_CTX,
+            },
+        },
+        timeout=OLLAMA_TIMEOUT,
+    )
+    response.raise_for_status()
+    return response.json().get("message", {}).get("content", "").strip()
