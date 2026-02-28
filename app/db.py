@@ -276,3 +276,11 @@ def get_logs(limit=100):
         return [dict(r) for r in conn.execute(
             "SELECT * FROM logs ORDER BY id DESC LIMIT ?", (limit,)
         ).fetchall()]
+
+
+def get_logs_range(start, end):
+    with get_db() as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT * FROM logs WHERE timestamp >= ? AND timestamp <= ? ORDER BY id ASC",
+            (start, end)
+        ).fetchall()]

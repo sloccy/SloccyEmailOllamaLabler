@@ -229,6 +229,25 @@ def api_get_logs():
     return jsonify(db.get_logs(limit))
 
 
+@app.route("/api/logs/download", methods=["GET"])
+def api_download_logs():
+    import csv, io
+    start = request.args.get("start", "")
+    end = request.args.get("end", "")
+    logs = db.get_logs_range(start, end)
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["timestamp", "level", "message"])
+    for l in logs:
+        w.writerow([l["timestamp"], l["level"], l["message"]])
+    filename = f"logs_{start[:10]}_{end[:10]}.csv"
+    return Response(
+        out.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @app.route("/api/status", methods=["GET"])
 def api_status():
     import time

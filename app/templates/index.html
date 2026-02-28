@@ -364,7 +364,24 @@
     <div class="page" id="page-logs">
       <div class="page-header">
         <div><div class="page-title">Logs</div><div class="page-sub">Last 100 events</div></div>
-        <button class="btn btn-ghost" onclick="loadLogs()">&#8635; Refresh</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost" onclick="toggleLogDownload()">&#8659; Download</button>
+          <button class="btn btn-ghost" onclick="loadLogs()">&#8635; Refresh</button>
+        </div>
+      </div>
+      <div class="panel" id="log-download-panel">
+        <div class="panel-title">Download Logs</div>
+        <div class="form-row" style="max-width:560px;margin-bottom:14px;">
+          <div class="form-group" style="margin:0;">
+            <label for="log-dl-start">From</label>
+            <input type="datetime-local" id="log-dl-start">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label for="log-dl-end">To</label>
+            <input type="datetime-local" id="log-dl-end">
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="downloadLogs()">Download CSV</button>
       </div>
       <div id="logs-list" class="log-list"><div class="empty"><div class="empty-icon">&#9645;</div>No logs yet.</div></div>
     </div>
@@ -822,6 +839,28 @@
   async function loadLogs() {
     const logs = await fetch('/api/logs?limit=100').then(r => r.json());
     renderLogs(logs, 'logs-list');
+  }
+
+  function toggleLogDownload() {
+    const panel = document.getElementById('log-download-panel');
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open')) {
+      const now = new Date();
+      const yesterday = new Date(now - 86400000);
+      const toLocal = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      document.getElementById('log-dl-end').value = toLocal(now);
+      document.getElementById('log-dl-start').value = toLocal(yesterday);
+    }
+  }
+
+  function downloadLogs() {
+    const start = document.getElementById('log-dl-start').value;
+    const end = document.getElementById('log-dl-end').value;
+    if (!start || !end) { toast('Select a start and end time.', 'error'); return; }
+    if (start >= end) { toast('Start must be before end.', 'error'); return; }
+    // Convert local datetime-local values to SQLite-compatible UTC strings
+    const toUTC = s => new Date(s).toISOString().replace('T', ' ').slice(0, 19);
+    window.location.href = `/api/logs/download?start=${encodeURIComponent(toUTC(start))}&end=${encodeURIComponent(toUTC(end))}`;
   }
 
   function renderLogs(logs, containerId) {
