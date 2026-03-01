@@ -1,3 +1,4 @@
+#docker buildx build --platform linux/amd64 -t ghcr.io/sloccy/sloccyemailollamalabler:latest --push .
 services:
   ollama:
     image: ollama/ollama
