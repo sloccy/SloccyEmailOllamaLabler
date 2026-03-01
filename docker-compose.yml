@@ -1,6 +1,6 @@
 services:
   ollama:
-    image: ollama/ollama
+    image: ollama/ollama:latest
     container_name: gmail-labeler-ollama
     privileged: true
     cpuset: "0,1,2,3,4"
