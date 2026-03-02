@@ -120,6 +120,10 @@ def _scan_account(account, prompts):
                             gmail_client.archive_email(service, email["id"])
                             actions_taken.append("archived")
 
+                        if prompt.get("action_mark_read"):
+                            gmail_client.mark_email_read(service, email["id"])
+                            actions_taken.append("marked as read")
+
                         if prompt.get("stop_processing"):
                             actions_taken.append("stopped further rules")
                             stop = True

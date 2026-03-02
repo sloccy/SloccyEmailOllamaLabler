@@ -141,6 +141,14 @@ def trash_email(service, message_id: str):
     ).execute()
 
 
+def mark_email_read(service, message_id: str):
+    service.users().messages().modify(
+        userId="me",
+        id=message_id,
+        body={"removeLabelIds": ["UNREAD"]},
+    ).execute()
+
+
 def _extract_body(payload) -> str:
     if "parts" in payload:
         for part in payload["parts"]:

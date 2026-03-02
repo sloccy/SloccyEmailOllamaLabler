@@ -45,6 +45,7 @@ def init_db():
                 action_spam INTEGER DEFAULT 0,
                 action_move_to TEXT DEFAULT '',
                 action_trash INTEGER DEFAULT 0,
+                action_mark_read INTEGER DEFAULT 0,
                 sort_order INTEGER DEFAULT 0,
                 stop_processing INTEGER DEFAULT 0,
                 account_id INTEGER DEFAULT NULL
@@ -110,6 +111,7 @@ def _migrate():
         "ALTER TABLE prompts ADD COLUMN action_spam INTEGER DEFAULT 0",
         "ALTER TABLE prompts ADD COLUMN action_move_to TEXT DEFAULT ''",
         "ALTER TABLE prompts ADD COLUMN action_trash INTEGER DEFAULT 0",
+        "ALTER TABLE prompts ADD COLUMN action_mark_read INTEGER DEFAULT 0",
         "ALTER TABLE prompts ADD COLUMN sort_order INTEGER DEFAULT 0",
         "ALTER TABLE prompts ADD COLUMN stop_processing INTEGER DEFAULT 0",
         "ALTER TABLE prompts ADD COLUMN account_id INTEGER DEFAULT NULL",
@@ -209,31 +211,31 @@ def list_prompts(account_id=None):
 
 
 def create_prompt(name, instructions, label_name, action_archive=0, action_spam=0,
-                  action_trash=0, stop_processing=0, account_id=None):
+                  action_trash=0, action_mark_read=0, stop_processing=0, account_id=None):
     with get_db() as conn:
         row = conn.execute("SELECT MAX(sort_order) as m FROM prompts").fetchone()
         next_order = (row["m"] or 0) + 1
         conn.execute(
             """INSERT INTO prompts
                (name, instructions, label_name, action_archive, action_spam,
-                action_trash, sort_order, stop_processing, account_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                action_trash, action_mark_read, sort_order, stop_processing, account_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (name, instructions, label_name, action_archive, action_spam,
-             action_trash, next_order, stop_processing,
+             action_trash, action_mark_read, next_order, stop_processing,
              account_id if account_id else None),
         )
 
 
 def update_prompt(prompt_id, name, instructions, label_name, active,
-                  action_archive=0, action_spam=0, action_trash=0,
+                  action_archive=0, action_spam=0, action_trash=0, action_mark_read=0,
                   stop_processing=0, account_id=None):
     with get_db() as conn:
         conn.execute(
             """UPDATE prompts SET name=?, instructions=?, label_name=?, active=?,
-               action_archive=?, action_spam=?, action_trash=?,
+               action_archive=?, action_spam=?, action_trash=?, action_mark_read=?,
                stop_processing=?, account_id=? WHERE id=?""",
             (name, instructions, label_name, active, action_archive, action_spam,
-             action_trash, stop_processing,
+             action_trash, action_mark_read, stop_processing,
              account_id if account_id else None, prompt_id),
         )
 

@@ -116,6 +116,7 @@ def api_create_prompt():
         action_archive=int(data.get("action_archive", 0)),
         action_spam=int(data.get("action_spam", 0)),
         action_trash=int(data.get("action_trash", 0)),
+        action_mark_read=int(data.get("action_mark_read", 0)),
         stop_processing=int(data.get("stop_processing", 0)),
         account_id=int(account_id) if account_id else None,
     )
@@ -139,6 +140,7 @@ def api_update_prompt(prompt_id):
         action_archive=int(data.get("action_archive", 0)),
         action_spam=int(data.get("action_spam", 0)),
         action_trash=int(data.get("action_trash", 0)),
+        action_mark_read=int(data.get("action_mark_read", 0)),
         stop_processing=int(data.get("stop_processing", 0)),
         account_id=int(account_id) if account_id else None,
     )
@@ -174,7 +176,7 @@ def api_export_prompts():
         prompts = db.list_prompts()
 
     export_fields = ["name", "instructions", "label_name", "active", "action_archive",
-                     "action_spam", "action_trash", "stop_processing", "account_id"]
+                     "action_spam", "action_trash", "action_mark_read", "stop_processing", "account_id"]
     export_data = [{k: p[k] for k in export_fields if k in p} for p in prompts]
 
     accounts = {a["id"]: a["email"] for a in db.list_accounts()}

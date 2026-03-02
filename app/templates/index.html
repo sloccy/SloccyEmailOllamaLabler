@@ -318,6 +318,7 @@
             <div class="action-item"><input type="checkbox" id="new-action-archive"><label for="new-action-archive">Archive</label></div>
             <div class="action-item"><input type="checkbox" id="new-action-spam"><label for="new-action-spam">Send to Spam</label></div>
             <div class="action-item"><input type="checkbox" id="new-action-trash"><label for="new-action-trash">Trash</label></div>
+            <div class="action-item"><input type="checkbox" id="new-action-mark-read"><label for="new-action-mark-read">Mark as Read</label></div>
           </div>
         </div>
         <div class="stop-processing-row">
@@ -686,6 +687,7 @@
         p.action_archive ? '<span class="badge badge-muted" style="margin-left:6px;">archive</span>' : '',
         p.action_spam ? '<span class="badge" style="margin-left:6px;background:rgba(239,68,68,0.1);color:var(--red);">spam</span>' : '',
         p.action_trash ? '<span class="badge badge-muted" style="margin-left:6px;">🗑 trash</span>' : '',
+        p.action_mark_read ? '<span class="badge badge-muted" style="margin-left:6px;">mark read</span>' : '',
         p.stop_processing ? '<span class="badge badge-stop" style="margin-left:6px;">&#9940; stop</span>' : '',
       ].join('');
 
@@ -733,6 +735,7 @@
                   <div class="action-item"><input type="checkbox" id="edit-action-archive-${p.id}" ${p.action_archive ? 'checked' : ''}><label for="edit-action-archive-${p.id}">Archive</label></div>
                   <div class="action-item"><input type="checkbox" id="edit-action-spam-${p.id}" ${p.action_spam ? 'checked' : ''}><label for="edit-action-spam-${p.id}">Send to Spam</label></div>
                   <div class="action-item"><input type="checkbox" id="edit-action-trash-${p.id}" ${p.action_trash ? 'checked' : ''}><label for="edit-action-trash-${p.id}">Trash</label></div>
+                  <div class="action-item"><input type="checkbox" id="edit-action-mark-read-${p.id}" ${p.action_mark_read ? 'checked' : ''}><label for="edit-action-mark-read-${p.id}">Mark as Read</label></div>
                 </div>
               </div>
               <div class="stop-processing-row">
@@ -769,16 +772,17 @@
     const action_archive = document.getElementById('new-action-archive').checked ? 1 : 0;
     const action_spam = document.getElementById('new-action-spam').checked ? 1 : 0;
     const action_trash = document.getElementById('new-action-trash')?.checked ? 1 : 0;
+    const action_mark_read = document.getElementById('new-action-mark-read')?.checked ? 1 : 0;
     const stop_processing = document.getElementById('new-stop-processing').checked ? 1 : 0;
 
     const r = await fetch('/api/prompts', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, instructions, label_name, account_id, action_archive, action_spam, action_trash, stop_processing }),
+      body: JSON.stringify({ name, instructions, label_name, account_id, action_archive, action_spam, action_trash, action_mark_read, stop_processing }),
     });
     if (r.ok) {
       toast('Rule created.');
       ['new-prompt-name','new-prompt-instructions','new-prompt-label'].forEach(id => document.getElementById(id).value = '');
-      ['new-action-archive','new-action-spam','new-action-trash','new-stop-processing'].forEach(id => document.getElementById(id).checked = false);
+      ['new-action-archive','new-action-spam','new-action-trash','new-action-mark-read','new-stop-processing'].forEach(id => document.getElementById(id).checked = false);
       document.getElementById('new-prompt-account').value = '';
       document.getElementById('add-prompt-panel').classList.remove('open');
       loadPrompts();
@@ -806,10 +810,11 @@
     const action_archive = document.getElementById('edit-action-archive-' + id)?.checked ? 1 : 0;
     const action_spam = document.getElementById('edit-action-spam-' + id)?.checked ? 1 : 0;
     const action_trash = document.getElementById('edit-action-trash-' + id)?.checked ? 1 : 0;
+    const action_mark_read = document.getElementById('edit-action-mark-read-' + id)?.checked ? 1 : 0;
     const stop_processing = document.getElementById('edit-stop-processing-' + id)?.checked ? 1 : 0;
     const r = await fetch(`/api/prompts/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, instructions, label_name, active, account_id, action_archive, action_spam, action_trash, stop_processing }),
+      body: JSON.stringify({ name, instructions, label_name, active, account_id, action_archive, action_spam, action_trash, action_mark_read, stop_processing }),
     });
     if (!r.ok) { const e = await r.json().catch(() => ({})); toast(e.error || 'Error', 'error'); return; }
     toast('Rule updated.');
@@ -822,7 +827,7 @@
     if (!p) return;
     const r = await fetch(`/api/prompts/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: p.name, instructions: p.instructions, label_name: p.label_name, active: current ? 0 : 1, account_id: p.account_id, action_archive: p.action_archive, action_spam: p.action_spam, action_trash: p.action_trash, stop_processing: p.stop_processing }),
+      body: JSON.stringify({ name: p.name, instructions: p.instructions, label_name: p.label_name, active: current ? 0 : 1, account_id: p.account_id, action_archive: p.action_archive, action_spam: p.action_spam, action_trash: p.action_trash, action_mark_read: p.action_mark_read, stop_processing: p.stop_processing }),
     });
     if (!r.ok) { const e = await r.json().catch(() => ({})); toast(e.error || 'Error', 'error'); return; }
     toast(current ? 'Rule paused.' : 'Rule resumed.');
