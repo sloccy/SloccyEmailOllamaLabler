@@ -279,6 +279,25 @@ def api_generate_prompt():
         return jsonify({"error": "Generation failed. Check Ollama is running."}), 500
 
 
+# ---- History ----
+
+@app.route("/api/history", methods=["GET"])
+def api_get_history():
+    account_id = request.args.get("account_id")
+    prompt_id = request.args.get("prompt_id")
+    subject = request.args.get("subject", "").strip()
+    sender = request.args.get("sender", "").strip()
+    limit = min(int(request.args.get("limit", 200)), 500)
+    rows = db.get_categorization_history(
+        account_id=int(account_id) if account_id else None,
+        prompt_id=int(prompt_id) if prompt_id else None,
+        subject=subject or None,
+        sender=sender or None,
+        limit=limit,
+    )
+    return jsonify(rows)
+
+
 # ---- Startup ----
 
 def _get_or_create_secret_key() -> str:

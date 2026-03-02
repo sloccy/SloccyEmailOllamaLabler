@@ -128,6 +128,17 @@ def _scan_account(account, prompts):
                             "INFO",
                             f"[{email_addr}] '{email['subject'][:60]}' — {', '.join(actions_taken)} (rule: {prompt['name']})",
                         )
+                        db.add_categorization(
+                            account_id=account_id,
+                            account_email=email_addr,
+                            message_id=email["id"],
+                            subject=email.get("subject", ""),
+                            sender=email.get("sender", ""),
+                            prompt_id=prompt["id"],
+                            prompt_name=prompt["name"],
+                            label_name=prompt["label_name"],
+                            actions=", ".join(actions_taken),
+                        )
                     else:
                         db.add_log(
                             "DEBUG",

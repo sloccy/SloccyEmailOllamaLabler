@@ -160,6 +160,24 @@
     .alert-error { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); color: var(--red); }
     .alert-success { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.25); color: var(--green); }
 
+    /* History */
+    .history-filters { display: flex; flex-wrap: wrap; gap: 10px 16px; margin-bottom: 20px; align-items: flex-end; }
+    .history-filters .form-group { margin: 0; }
+    .history-filters input[type="text"], .history-filters select { width: auto; min-width: 170px; }
+    .history-count { font-size: 12px; color: var(--muted); margin-bottom: 12px; font-family: var(--mono); }
+    .history-table-wrap { overflow-x: auto; }
+    .history-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    .history-table th { text-align: left; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; padding: 0 16px 10px 0; border-bottom: 1px solid var(--border); font-weight: 500; white-space: nowrap; }
+    .history-table td { padding: 10px 16px 10px 0; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--text); }
+    .history-table tr:last-child td { border-bottom: none; }
+    .history-table .col-time { width: 130px; color: var(--muted); font-family: var(--mono); font-size: 11.5px; white-space: nowrap; }
+    .history-table .col-account { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11.5px; }
+    .history-table .col-subject { min-width: 160px; word-break: break-word; }
+    .history-table .col-sender { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); }
+    .history-table .col-rule { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .history-table .col-label { width: 120px; }
+    .history-table .col-actions { width: 110px; }
+
     #toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--border2); border-radius: 9px; padding: 12px 18px; font-size: 13px; box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.03); transform: translateY(80px); opacity: 0; transition: transform 0.28s cubic-bezier(0.34,1.56,0.64,1), opacity 0.22s ease; z-index: 999; max-width: 340px; }
     #toast.show { transform: translateY(0); opacity: 1; }
     #toast.success { border-color: rgba(34,197,94,0.4); box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 16px rgba(34,197,94,0.12); }
@@ -179,6 +197,7 @@
       <div class="nav-item" data-page="builder" onclick="navigate('builder', this)"><span class="nav-icon">&#9670;</span> Builder</div>
       <div class="nav-item" data-page="settings" onclick="navigate('settings', this)"><span class="nav-icon">&#9633;</span> Settings</div>
       <div class="nav-item" data-page="logs" onclick="navigate('logs', this)"><span class="nav-icon">&#9645;</span> Logs</div>
+      <div class="nav-item" data-page="history" onclick="navigate('history', this)"><span class="nav-icon">&#9699;</span> History</div>
     </nav>
     <div class="sidebar-footer">
       <div class="status-pill">
@@ -386,6 +405,55 @@
       <div id="logs-list" class="log-list"><div class="empty"><div class="empty-icon">&#9645;</div>No logs yet.</div></div>
     </div>
 
+    <!-- Categorization History -->
+    <div class="page" id="page-history">
+      <div class="page-header">
+        <div><div class="page-title">Categorization History</div><div class="page-sub">Emails recently labeled by your rules</div></div>
+        <button class="btn btn-ghost" onclick="loadHistory()">&#8635; Refresh</button>
+      </div>
+      <div class="history-filters">
+        <div class="form-group">
+          <label>Account</label>
+          <select id="hist-filter-account" onchange="loadHistory()">
+            <option value="">All accounts</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Rule</label>
+          <select id="hist-filter-rule" onchange="loadHistory()">
+            <option value="">All rules</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Subject</label>
+          <input type="text" id="hist-filter-subject" placeholder="Search subject…" oninput="debounceHistory()">
+        </div>
+        <div class="form-group">
+          <label>Sender</label>
+          <input type="text" id="hist-filter-sender" placeholder="Search sender…" oninput="debounceHistory()">
+        </div>
+      </div>
+      <div id="hist-count" class="history-count"></div>
+      <div class="history-table-wrap">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th class="col-time">Time</th>
+              <th class="col-account">Account</th>
+              <th class="col-subject">Subject</th>
+              <th class="col-sender">Sender</th>
+              <th class="col-rule">Rule</th>
+              <th class="col-label">Label</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="hist-body">
+            <tr><td colspan="7"><div class="empty"><div class="empty-icon">&#9699;</div>No history yet. Labels will appear here after emails are scanned.</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -409,6 +477,7 @@
     if (page === 'settings') loadSettings();
     if (page === 'logs') loadLogs();
     if (page === 'dashboard') loadDashboard();
+    if (page === 'history') loadHistoryFilters();
   }
 
   // ---- Toast ----
@@ -915,6 +984,71 @@
     if (!r.ok) { const e = await r.json().catch(() => ({})); toast(e.error || 'Error', 'error'); return; }
     toast('Scan triggered. Check logs for results.');
     setTimeout(loadDashboard, 2000);
+  }
+
+  // ---- History ----
+  let _histDebounce = null;
+
+  function debounceHistory() {
+    clearTimeout(_histDebounce);
+    _histDebounce = setTimeout(loadHistory, 350);
+  }
+
+  async function loadHistoryFilters() {
+    if (!_accounts.length) {
+      _accounts = await fetch('/api/accounts').then(r => r.json());
+    }
+    const accountSel = document.getElementById('hist-filter-account');
+    const curAccount = accountSel.value;
+    accountSel.innerHTML = '<option value="">All accounts</option>' +
+      _accounts.map(a => `<option value="${a.id}" ${curAccount == a.id ? 'selected' : ''}>${esc(a.email)}</option>`).join('');
+
+    const ruleSel = document.getElementById('hist-filter-rule');
+    const curRule = ruleSel.value;
+    const prompts = await fetch('/api/prompts').then(r => r.json());
+    ruleSel.innerHTML = '<option value="">All rules</option>' +
+      prompts.map(p => `<option value="${p.id}" ${curRule == p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
+
+    loadHistory();
+  }
+
+  async function loadHistory() {
+    const accountId = document.getElementById('hist-filter-account')?.value || '';
+    const promptId = document.getElementById('hist-filter-rule')?.value || '';
+    const subject = document.getElementById('hist-filter-subject')?.value || '';
+    const sender = document.getElementById('hist-filter-sender')?.value || '';
+    const params = new URLSearchParams();
+    if (accountId) params.set('account_id', accountId);
+    if (promptId) params.set('prompt_id', promptId);
+    if (subject) params.set('subject', subject);
+    if (sender) params.set('sender', sender);
+    const rows = await fetch('/api/history?' + params.toString()).then(r => r.json());
+    renderHistory(rows);
+  }
+
+  function renderHistory(rows) {
+    const tbody = document.getElementById('hist-body');
+    const countEl = document.getElementById('hist-count');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="empty-icon">&#9699;</div>No matching history found.</div></td></tr>';
+      countEl.textContent = '';
+      return;
+    }
+    countEl.textContent = `${rows.length} result${rows.length === 1 ? '' : 's'}`;
+    tbody.innerHTML = rows.map(r => {
+      const extraActions = (r.actions || '').split(',').map(a => a.trim())
+        .filter(a => a && !a.startsWith('labeled \u2192'));
+      const actionBadges = extraActions.map(a => `<span class="badge badge-muted" style="margin-right:3px;">${esc(a)}</span>`).join('');
+      return `<tr>
+        <td class="col-time">${fmtDate(r.timestamp)}</td>
+        <td class="col-account" title="${esc(r.account_email)}">${esc(r.account_email)}</td>
+        <td class="col-subject">${esc(r.subject || '(no subject)')}</td>
+        <td class="col-sender" title="${esc(r.sender)}">${esc(r.sender || '—')}</td>
+        <td class="col-rule" title="${esc(r.prompt_name)}">${esc(r.prompt_name)}</td>
+        <td class="col-label"><span class="tag">${esc(r.label_name)}</span></td>
+        <td class="col-actions">${actionBadges || '<span style="color:var(--muted)">—</span>'}</td>
+      </tr>`;
+    }).join('');
   }
 
   // ---- Helpers ----

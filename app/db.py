@@ -69,6 +69,20 @@ def init_db():
                 message TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS categorization_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT DEFAULT (datetime('now')),
+                account_id INTEGER NOT NULL,
+                account_email TEXT NOT NULL,
+                message_id TEXT NOT NULL,
+                subject TEXT DEFAULT '',
+                sender TEXT DEFAULT '',
+                prompt_id INTEGER,
+                prompt_name TEXT,
+                label_name TEXT,
+                actions TEXT DEFAULT ''
+            );
+
             -- Create indexes for better performance
             CREATE INDEX IF NOT EXISTS idx_processed_emails_account_id ON processed_emails(account_id);
             CREATE INDEX IF NOT EXISTS idx_processed_emails_message_id ON processed_emails(message_id);
@@ -76,6 +90,9 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_prompts_active ON prompts(active);
             CREATE INDEX IF NOT EXISTS idx_prompts_account_id ON prompts(account_id);
             CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
+            CREATE INDEX IF NOT EXISTS idx_cat_history_account_id ON categorization_history(account_id);
+            CREATE INDEX IF NOT EXISTS idx_cat_history_prompt_id ON categorization_history(prompt_id);
+            CREATE INDEX IF NOT EXISTS idx_cat_history_timestamp ON categorization_history(timestamp);
 
         """)
     with get_db() as conn:
@@ -283,4 +300,44 @@ def get_logs_range(start, end):
         return [dict(r) for r in conn.execute(
             "SELECT * FROM logs WHERE timestamp >= ? AND timestamp <= ? ORDER BY id ASC",
             (start, end)
+        ).fetchall()]
+
+
+# ---- Categorization History ----
+
+def add_categorization(account_id, account_email, message_id, subject, sender,
+                       prompt_id, prompt_name, label_name, actions):
+    with get_db() as conn:
+        conn.execute(
+            """INSERT INTO categorization_history
+               (account_id, account_email, message_id, subject, sender,
+                prompt_id, prompt_name, label_name, actions)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (account_id, account_email, message_id, subject, sender,
+             prompt_id, prompt_name, label_name, actions),
+        )
+
+
+def get_categorization_history(account_id=None, prompt_id=None,
+                                subject=None, sender=None, limit=200):
+    wheres = []
+    params = []
+    if account_id is not None:
+        wheres.append("account_id = ?")
+        params.append(account_id)
+    if prompt_id is not None:
+        wheres.append("prompt_id = ?")
+        params.append(prompt_id)
+    if subject:
+        wheres.append("subject LIKE ?")
+        params.append(f"%{subject}%")
+    if sender:
+        wheres.append("sender LIKE ?")
+        params.append(f"%{sender}%")
+    params.append(limit)
+    where_clause = ("WHERE " + " AND ".join(wheres)) if wheres else ""
+    with get_db() as conn:
+        return [dict(r) for r in conn.execute(
+            f"SELECT * FROM categorization_history {where_clause} ORDER BY id DESC LIMIT ?",
+            params
         ).fetchall()]
