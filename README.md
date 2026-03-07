@@ -1,4 +1,4 @@
-# Gmail Labeler
+# OllaMail
 
 A self-hosted email labeling system that runs a local LLM (Llama 3.2 via Ollama) to scan Gmail accounts and apply labels based on rules you define through a web interface.
 
@@ -19,7 +19,7 @@ Runs fully in Docker. No data leaves your machine.
 ### 1. Clone / copy this project
 
 ```
-gmail-labeler/
+ollamail/
 ├── docker-compose.yml
 ├── Dockerfile
 ├── requirements.txt

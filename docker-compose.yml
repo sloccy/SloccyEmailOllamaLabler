@@ -1,7 +1,7 @@
 services:
   ollama:
     image: ollama/ollama:latest
-    container_name: gmail-labeler-ollama
+    container_name: ollamail-ollama
     privileged: true
     cpuset: "0,1,2,3,4"
     volumes:
@@ -21,13 +21,13 @@ services:
               capabilities: [gpu]
 
   app:
-    image: ghcr.io/sloccy/sloccyemailollamalabeler:latest
-    container_name: gmail-labeler-app
+    image: ghcr.io/sloccy/ollamail:latest
+    container_name: ollamail-app
     ports:
       - "5001:5000"
     volumes:
-      - /home/docker/docker/gmail-labeler/data:/data
-      - /home/docker/docker/gmail-labeler/credentials:/credentials
+      - /home/docker/docker/ollamail/data:/data
+      - /home/docker/docker/ollamail/credentials:/credentials
     environment:
       - OLLAMA_HOST=http://ollama:11434
       - OLLAMA_MODEL=qwen3:8b-q4_K_M
