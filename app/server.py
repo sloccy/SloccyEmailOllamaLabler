@@ -87,6 +87,23 @@ def api_toggle_account(account_id):
     return jsonify({"active": new_state})
 
 
+def _ensure_label_for_accounts(account_id, label_name):
+    if account_id is not None:
+        accounts = [db.get_account(account_id)]
+    else:
+        accounts = [a for a in db.list_accounts() if a.get("active")]
+    for account in accounts:
+        if not account:
+            continue
+        try:
+            service, refreshed_creds = gmail_client.get_service(account["credentials_json"])
+            if json.loads(refreshed_creds) != json.loads(account["credentials_json"]):
+                db.update_account_credentials(account["id"], refreshed_creds)
+            gmail_client.build_label_cache(service, [label_name])
+        except Exception as e:
+            db.add_log("WARNING", f"Could not pre-create label '{label_name}' for account {account.get('id')}: {e}")
+
+
 # ---- Prompts ----
 
 @app.route("/api/prompts", methods=["GET"])
@@ -118,6 +135,7 @@ def api_create_prompt():
         stop_processing=int(data.get("stop_processing", 0)),
         account_id=int(account_id) if account_id else None,
     )
+    _ensure_label_for_accounts(int(account_id) if account_id else None, data["label_name"])
     scope = f"account {account_id}" if account_id else "all accounts"
     db.add_log("INFO", f"Prompt created: {data['name']} → label '{data['label_name']}' ({scope})")
     return jsonify({"ok": True}), 201
@@ -142,6 +160,7 @@ def api_update_prompt(prompt_id):
         stop_processing=int(data.get("stop_processing", 0)),
         account_id=int(account_id) if account_id else None,
     )
+    _ensure_label_for_accounts(int(account_id) if account_id else None, data["label_name"])
     return jsonify({"ok": True})
 
 
