@@ -66,7 +66,7 @@ No explanation, no markdown, just the JSON object."""
                     "format": "json",
                     "options": {
                         "temperature": 0,
-                        "num_predict": OLLAMA_NUM_PREDICT,
+                        "num_predict": max(50, len(prompts) * 20),
                         "num_ctx": OLLAMA_NUM_CTX,
                     },
                 },
@@ -102,35 +102,101 @@ No explanation, no markdown, just the JSON object."""
             print(f"Warning: LLM unexpected error: {e!r}")
             return {p["id"]: False for p in prompts}
 
-    def generate_prompt_instruction(self, description: str) -> str:
-        prompt = f"""A user wants to automatically label certain emails in Gmail. They described what they want to catch:
+    def _build_generate_request(self, description: str) -> dict:
+        system_prompt = (
+            "You write precise email filter rules for an AI classifier. "
+            "The rule must specify:\n"
+            "- Exact positive signals (what SHOULD trigger the label)\n"
+            "- What should NOT trigger it (to prevent false positives)\n"
+            "- Specific sender domains, subject keywords, or body patterns where applicable\n"
+            "Output only the rule text. No preamble, no quotes, no explanation."
+        )
+        user_prompt = (
+            f'A user wants to automatically label certain emails. They described:\n\n"{description}"\n\n'
+            "Write a precise classifier instruction (2-5 sentences). Be concrete:\n"
+            "- State what specific content, sender patterns, or subject keywords indicate a match\n"
+            "- State what distinguishes these emails from similar-but-different ones (to avoid false positives)\n"
+            "- If the description is generic (e.g. \"promotional emails\"), name specific signals: "
+            "unsubscribe links, \"% off\", bulk sender headers, marketing domains, etc.\n\n"
+            "Respond with ONLY the instruction text."
+        )
+        return {
+            "model": OLLAMA_MODEL,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "options": {
+                "temperature": 0.7,
+                "num_predict": OLLAMA_GENERATE_NUM_PREDICT,
+                "num_ctx": OLLAMA_NUM_CTX,
+            },
+        }
 
-"{description}"
+    def _filter_think_chunks(self, buffer: str, in_think: bool, chunk: str):
+        """Append chunk to buffer, flush safe content, return (events, new_buffer, in_think).
+        Events are (type, text) tuples where type is 'think' or 'content'."""
+        buffer += chunk
+        events = []
+        while True:
+            tag = "</think>" if in_think else "<think>"
+            idx = buffer.find(tag)
+            if idx == -1:
+                # No complete tag — keep up to len(tag)-1 chars buffered
+                safe = max(0, len(buffer) - (len(tag) - 1))
+                if safe > 0:
+                    events.append(("think" if in_think else "content", buffer[:safe]))
+                    buffer = buffer[safe:]
+                break
+            else:
+                if idx > 0:
+                    events.append(("think" if in_think else "content", buffer[:idx]))
+                buffer = buffer[idx + len(tag):]
+                in_think = not in_think
+        return events, buffer, in_think
 
-Write a clear, specific instruction (2-4 sentences) that an AI email classifier can use to decide whether to apply a label to an email. Cover content, sender patterns, subject patterns, and context clues where relevant. Be precise so the classifier doesn't over- or under-match.
-
-Respond with ONLY the instruction text. No preamble, no quotes, no explanation."""
-
+    def stream_generate_prompt_instruction(self, description: str):
+        """Generator that yields {"type": "think"|"content", "text": str} dicts."""
+        payload = self._build_generate_request(description)
+        payload["stream"] = True
         response = requests.post(
             f"{OLLAMA_HOST}/api/chat",
-            json={
-                "model": OLLAMA_MODEL,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "You write precise email filter instructions. Output only the instruction, nothing else.",
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                "stream": False,
-                "think": False,
-                "options": {
-                    "temperature": 0.7,
-                    "num_predict": OLLAMA_GENERATE_NUM_PREDICT,
-                    "num_ctx": OLLAMA_NUM_CTX,
-                },
-            },
+            json=payload,
+            stream=True,
             timeout=OLLAMA_TIMEOUT,
         )
         response.raise_for_status()
-        return response.json().get("message", {}).get("content", "").strip()
+        in_think = False
+        buffer = ""
+        for line in response.iter_lines():
+            if not line:
+                continue
+            try:
+                data = json.loads(line)
+            except Exception:
+                continue
+            token = data.get("message", {}).get("content", "")
+            if not token:
+                continue
+            events, buffer, in_think = self._filter_think_chunks(buffer, in_think, token)
+            for evt_type, evt_text in events:
+                if evt_text:
+                    yield {"type": evt_type, "text": evt_text}
+        # Flush remaining buffer
+        if buffer:
+            yield {"type": "think" if in_think else "content", "text": buffer}
+
+    def generate_prompt_instruction(self, description: str) -> str:
+        payload = self._build_generate_request(description)
+        payload["stream"] = False
+        response = requests.post(
+            f"{OLLAMA_HOST}/api/chat",
+            json=payload,
+            timeout=OLLAMA_TIMEOUT,
+        )
+        response.raise_for_status()
+        content = response.json().get("message", {}).get("content", "").strip()
+        # Strip think blocks in case model includes them despite stream=False
+        import re
+        content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+        return content

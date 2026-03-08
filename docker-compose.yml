@@ -41,10 +41,10 @@ services:
       - OLLAMA_TIMEOUT=600
       # LLM context window size in tokens (default: 4096)
       # Increase if you have many rules or long emails, at the cost of more VRAM
-      - OLLAMA_NUM_CTX=4096
+      #- OLLAMA_NUM_CTX=4096
       # Max tokens the LLM can generate per response (default: 200)
       # The JSON classification response is small, so 200 is plenty
-      - OLLAMA_NUM_PREDICT=200
+      #- OLLAMA_NUM_PREDICT=200
       # How many emails to fetch per inbox scan (default: 50)
       # Only unprocessed emails are classified, so higher values are safe
       - GMAIL_MAX_RESULTS=10

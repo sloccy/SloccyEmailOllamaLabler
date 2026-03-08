@@ -349,6 +349,10 @@
 
         <div id="builder-result" style="display:none;margin-top:28px;">
           <hr class="divider">
+          <div id="builder-thinking-wrap" style="display:none;margin-bottom:18px;">
+            <div style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:6px;letter-spacing:0.05em;">&#9670; THINKING</div>
+            <div id="builder-thinking" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-size:12px;font-family:var(--mono);color:var(--muted);white-space:pre-wrap;max-height:180px;overflow-y:auto;line-height:1.6;"></div>
+          </div>
           <div class="form-title">Generated instruction</div>
           <div class="form-group">
             <textarea id="builder-instruction" rows="5"></textarea>
@@ -1045,16 +1049,44 @@
     if (!description) { toast('Describe the emails first.', 'error'); return; }
     const btn = document.getElementById('btn-generate');
     btn.disabled = true; btn.textContent = 'Generating...';
-    document.getElementById('builder-result').style.display = 'none';
+    const resultEl = document.getElementById('builder-result');
+    const thinkWrap = document.getElementById('builder-thinking-wrap');
+    const thinkEl = document.getElementById('builder-thinking');
+    const instructionEl = document.getElementById('builder-instruction');
+    resultEl.style.display = 'block';
+    thinkWrap.style.display = 'none';
+    thinkEl.textContent = '';
+    instructionEl.value = '';
     try {
       const r = await fetch('/api/prompts/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description }),
       });
-      if (!r.ok) { const e = await r.json().catch(() => ({})); toast(e.error || 'Generation failed.', 'error'); return; }
-      const data = await r.json();
-      document.getElementById('builder-instruction').value = data.instruction;
-      document.getElementById('builder-result').style.display = 'block';
+      if (!r.ok) { toast('Generation failed.', 'error'); resultEl.style.display = 'none'; return; }
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const payload = line.slice(6).trim();
+          if (payload === '[DONE]') { btn.disabled = false; btn.textContent = '◆ Generate Instruction'; return; }
+          try {
+            const evt = JSON.parse(payload);
+            if (evt.type === 'error') { toast(evt.text, 'error'); resultEl.style.display = 'none'; return; }
+            if (evt.type === 'think') { thinkWrap.style.display = 'block'; thinkEl.textContent += evt.text; thinkEl.scrollTop = thinkEl.scrollHeight; }
+            if (evt.type === 'content') { instructionEl.value += evt.text; }
+          } catch (_) {}
+        }
+      }
+    } catch (e) {
+      toast('Generation failed.', 'error');
+      resultEl.style.display = 'none';
     } finally {
       btn.disabled = false; btn.textContent = '◆ Generate Instruction';
     }

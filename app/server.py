@@ -271,12 +271,17 @@ def api_generate_prompt():
     description = data.get("description", "").strip()
     if not description:
         return jsonify({"error": "description is required"}), 400
-    try:
-        instruction = llm_client.generate_prompt_instruction(description)
-        return jsonify({"instruction": instruction})
-    except Exception as e:
-        db.add_log("ERROR", f"Prompt generation failed: {e}")
-        return jsonify({"error": "Generation failed. Check Ollama is running."}), 500
+
+    def generate():
+        try:
+            for event in llm_client.stream_generate_prompt_instruction(description):
+                yield f"data: {json.dumps(event)}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            db.add_log("ERROR", f"Prompt generation failed: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'text': 'Generation failed. Check Ollama is running.'})}\n\n"
+
+    return Response(generate(), content_type="text/event-stream")
 
 
 # ---- Account Gmail labels ----

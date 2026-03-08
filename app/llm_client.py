@@ -18,3 +18,7 @@ def classify_email_batch(email: dict, prompts: list) -> dict:
 
 def generate_prompt_instruction(description: str) -> str:
     return _provider.generate_prompt_instruction(description)
+
+
+def stream_generate_prompt_instruction(description: str):
+    return _provider.stream_generate_prompt_instruction(description)
