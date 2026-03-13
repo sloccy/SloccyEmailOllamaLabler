@@ -1,0 +1,50 @@
+{% set account_map = {} %}
+{% for a in accounts %}{% set _ = account_map.update({a.id: a.email}) %}{% endfor %}
+<div class="card" id="prompt-card-{{ p.id }}" data-id="{{ p.id }}"
+     ondragover="onDragOver(event)"
+     ondragleave="onDragLeave(event)"
+     ondrop="onDrop(event)">
+  <div class="card-row">
+    <div class="drag-handle" title="Drag to reorder" draggable="true"
+         ondragstart="onDragStart(event)" ondragend="onDragEnd(event)"
+         ondragover="onDragOver(event)" ondrop="onDrop(event)">&#9776;</div>
+    <div style="flex:1">
+      <div class="card-title">{{ p.name|e }}</div>
+      <div class="card-meta">Created {{ p.created_at|fmtdate }}</div>
+      <div style="margin-bottom:10px;">
+        <span class="tag">&#9654; {{ p.label_name|e }}</span>
+        {% if p.active %}
+          <span class="badge badge-green" style="margin-left:6px;">&#9679; active</span>
+        {% else %}
+          <span class="badge badge-muted" style="margin-left:6px;">paused</span>
+        {% endif %}
+        {% if p.account_id %}
+          <span class="badge badge-accent" style="margin-left:6px;">{{ account_map.get(p.account_id, 'account ' ~ p.account_id)|e }}</span>
+        {% else %}
+          <span class="badge badge-muted" style="margin-left:6px;">global</span>
+        {% endif %}
+        {% if p.action_archive %}<span class="badge badge-muted" style="margin-left:6px;">archive</span>{% endif %}
+        {% if p.action_spam %}<span class="badge" style="margin-left:6px;background:rgba(239,68,68,0.1);color:var(--red);">spam</span>{% endif %}
+        {% if p.action_trash %}<span class="badge badge-muted" style="margin-left:6px;">&#128465; trash</span>{% endif %}
+        {% if p.action_mark_read %}<span class="badge badge-muted" style="margin-left:6px;">mark read</span>{% endif %}
+        {% if p.stop_processing %}<span class="badge badge-stop" style="margin-left:6px;">&#9940; stop</span>{% endif %}
+      </div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.6;">{{ p.instructions|e }}</div>
+    </div>
+    <div class="card-actions" style="align-self:flex-start;">
+      <button class="btn btn-ghost btn-sm"
+        hx-post="/fragments/prompts/{{ p.id }}/toggle"
+        hx-target="#prompt-card-{{ p.id }}"
+        hx-swap="outerHTML">{{ 'Pause' if p.active else 'Resume' }}</button>
+      <button class="btn btn-ghost btn-sm"
+        hx-get="/fragments/prompts/{{ p.id }}/edit"
+        hx-target="#prompt-card-{{ p.id }}"
+        hx-swap="outerHTML">Edit</button>
+      <button class="btn btn-danger btn-sm"
+        hx-delete="/fragments/prompts/{{ p.id }}"
+        hx-target="#prompts-list"
+        hx-swap="innerHTML"
+        hx-confirm="Delete this rule?">Delete</button>
+    </div>
+  </div>
+</div>

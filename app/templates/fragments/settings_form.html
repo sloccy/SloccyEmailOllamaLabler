@@ -1,0 +1,19 @@
+<form id="settings-form" hx-patch="/fragments/settings" hx-target="#settings-form" hx-swap="outerHTML">
+  <div class="card" style="padding:0 22px;">
+    <div class="setting-row">
+      <div><div class="setting-label">Poll interval</div><div class="setting-desc">How often to scan for new emails (seconds). Minimum 30.</div></div>
+      <div class="setting-control"><input type="number" name="poll_interval" min="30" step="30" value="{{ poll_interval }}"></div>
+    </div>
+    <div class="setting-row">
+      <div><div class="setting-label">Ollama model</div><div class="setting-desc">Set via OLLAMA_MODEL in docker-compose.yml</div></div>
+      <div class="setting-control"><span class="tag">{{ ollama_model }}</span></div>
+    </div>
+    <div class="setting-row" style="border-bottom:none;">
+      <div><div class="setting-label">Ollama host</div><div class="setting-desc">Set via OLLAMA_HOST in docker-compose.yml</div></div>
+      <div class="setting-control"><span class="tag">{{ ollama_host }}</span></div>
+    </div>
+  </div>
+  <div style="margin-top:16px;">
+    <button type="submit" class="btn btn-primary">Save Changes</button>
+  </div>
+</form>

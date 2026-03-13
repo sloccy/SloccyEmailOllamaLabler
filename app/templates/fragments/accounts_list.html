@@ -1,0 +1,33 @@
+{% if accounts %}
+  {% for a in accounts %}
+  <div class="card">
+    <div class="card-row">
+      <div>
+        <div class="card-title">{{ a.email|e }}</div>
+        <div class="card-meta">Added {{ a.added_at|fmtdate }} &middot; Last scanned {{ a.last_scan_at|fmtdate }}</div>
+        {% if a.active %}
+          <span class="badge badge-green">&#9679; active</span>
+        {% else %}
+          <span class="badge badge-muted">paused</span>
+        {% endif %}
+      </div>
+      <div class="card-actions">
+        <button class="btn btn-ghost btn-sm"
+          hx-post="/fragments/accounts/{{ a.id }}/toggle"
+          hx-target="#accounts-list"
+          hx-swap="innerHTML">{{ 'Pause' if a.active else 'Resume' }}</button>
+        <button class="btn btn-danger btn-sm"
+          hx-delete="/fragments/accounts/{{ a.id }}"
+          hx-target="#accounts-list"
+          hx-swap="innerHTML"
+          hx-confirm="Remove this account? Its processed email history will also be cleared.">Remove</button>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+<div class="empty">
+  <div class="empty-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="16" cy="11" r="6"/><path d="M4 28c0-6.627 5.373-12 12-12s12 5.373 12 12" stroke-linecap="round"/></svg></div>
+  No accounts added yet.
+</div>
+{% endif %}

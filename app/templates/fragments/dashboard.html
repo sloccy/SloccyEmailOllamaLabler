@@ -1,0 +1,19 @@
+<div class="stats-row">
+  <div class="stat stat-blue"><div class="stat-label">Accounts</div><div class="stat-value accent">{{ accounts|length }}</div></div>
+  <div class="stat stat-green"><div class="stat-label">Active Prompts</div><div class="stat-value accent">{{ active_prompts }}</div></div>
+  <div class="stat stat-muted"><div class="stat-label">Poll Interval</div><div class="stat-value">{{ poll_interval }}</div></div>
+  <div class="stat stat-green"><div class="stat-label">Next Scan</div><div class="stat-value green">{{ next_scan }}</div></div>
+</div>
+<script>
+  (function(){
+    var dot = document.getElementById('pollerDot');
+    var lbl = document.getElementById('pollerLabel');
+    {% if poller_running %}
+    dot.classList.add('active'); lbl.textContent = 'running';
+    {% else %}
+    dot.classList.remove('active'); lbl.textContent = 'stopped';
+    {% endif %}
+  })();
+</script>
+<div class="form-title">Recent Activity</div>
+{% include 'fragments/logs_list.html' %}

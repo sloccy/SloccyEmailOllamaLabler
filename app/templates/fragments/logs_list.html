@@ -1,0 +1,16 @@
+{% if logs %}
+<div class="log-list">
+  {% for l in logs %}
+  <div class="log-entry {{ l.level }}">
+    <span class="log-time">{{ l.timestamp|fmtdate }}</span>
+    <span class="log-level {{ l.level }}">{{ l.level }}</span>
+    <span class="log-msg">{{ l.message|e }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty">
+  <div class="empty-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 8h20M6 14h20M6 20h14" stroke-linecap="round"/></svg></div>
+  No logs yet.
+</div>
+{% endif %}

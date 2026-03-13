@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OllaMail</title>
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -16,7 +14,8 @@
       --text: #e2e8f4; --muted: #4d5f7a; --muted2: #283348;
       --accent: #4a9eff; --accent-dim: rgba(74,158,255,0.08); --accent-glow: rgba(74,158,255,0.18);
       --green: #22c55e; --red: #ef4444; --blue: #4a9eff;
-      --mono: 'IBM Plex Mono', monospace; --sans: 'DM Sans', sans-serif;
+      --mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
+      --sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }
     html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
     .layout { display: flex; height: 100vh; overflow: hidden; }
@@ -95,8 +94,6 @@
     .action-item:hover { border-color: var(--muted); }
     .action-item input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--accent); cursor: pointer; }
     .action-item label { font-size: 12.5px; font-weight: 500; cursor: pointer; margin: 0; color: var(--text); }
-    .action-move-input { margin-top: 10px; display: none; }
-    .action-move-input.visible { display: block; }
 
     /* Drag */
     .drag-handle { cursor: grab; color: var(--muted2); font-size: 16px; padding: 0 8px 0 0; flex-shrink: 0; user-select: none; margin-top: 2px; }
@@ -190,6 +187,8 @@
     #toast.error { border-color: rgba(239,68,68,0.4); box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 16px rgba(239,68,68,0.12); }
     @keyframes pulse-border { 0%, 100% { box-shadow: 0 2px 12px rgba(74,158,255,0.25); } 50% { box-shadow: 0 0 0 3px rgba(74,158,255,0.35), 0 2px 18px rgba(74,158,255,0.4); } }
     .btn-generating { animation: pulse-border 1.2s ease-in-out infinite; }
+    .htmx-indicator { opacity: 0; transition: opacity 0.2s; }
+    .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
   </style>
 </head>
 <body>
@@ -199,14 +198,14 @@
       <img src="{{ url_for('static', filename='logo.png') }}" alt="OllaMail">
     </div>
     <nav class="nav">
-      <div class="nav-item active" data-page="dashboard" onclick="navigate('dashboard', this)"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg></span> Dashboard</div>
-      <div class="nav-item" data-page="accounts" onclick="navigate('accounts', this)"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke-linecap="round"/></svg></span> Accounts</div>
-      <div class="nav-item" data-page="prompts" onclick="navigate('prompts', this)"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 2h5.5l6.5 6.5-5 5L2.5 7V2z" stroke-linejoin="round"/><circle cx="5.5" cy="5.5" r="1" fill="currentColor" stroke="none"/></svg></span> Prompts</div>
-      <div class="nav-item" data-page="builder" onclick="navigate('builder', this)"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14l8-8" stroke-linecap="round"/><path d="M10.5 2l1.2 2.3 2.3 1.2-2.3 1.2-1.2 2.3-1.2-2.3-2.3-1.2 2.3-1.2z" fill="currentColor" stroke="none"/></svg></span> Builder</div>
-      <div class="nav-item" data-page="settings" onclick="navigate('settings', this)"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1.5v1.8M8 12.7v1.8M1.5 8h1.8M12.7 8h1.8M3.4 3.4l1.3 1.3M11.3 11.3l1.3 1.3M12.6 3.4l-1.3 1.3M4.7 11.3l-1.3 1.3" stroke-linecap="round"/></svg></span> Settings</div>
-      <div class="nav-item" data-page="logs" onclick="navigate('logs', this)"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4h10M3 8h10M3 12h6" stroke-linecap="round"/></svg></span> Logs</div>
-      <div class="nav-item" data-page="history" onclick="navigate('history', this)"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2.5 1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span> History</div>
-      <div class="nav-item" data-page="retention" onclick="navigate('retention', this)"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="3" rx="1"/><path d="M3 6v7h10V6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 9.5h4" stroke-linecap="round"/></svg></span> Retention</div>
+      <div class="nav-item active" data-page="dashboard" onclick="setActivePage('dashboard', this)"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg></span> Dashboard</div>
+      <div class="nav-item" data-page="accounts" onclick="setActivePage('accounts', this)"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke-linecap="round"/></svg></span> Accounts</div>
+      <div class="nav-item" data-page="prompts" onclick="setActivePage('prompts', this)"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 2h5.5l6.5 6.5-5 5L2.5 7V2z" stroke-linejoin="round"/><circle cx="5.5" cy="5.5" r="1" fill="currentColor" stroke="none"/></svg></span> Prompts</div>
+      <div class="nav-item" data-page="builder" onclick="setActivePage('builder', this)"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14l8-8" stroke-linecap="round"/><path d="M10.5 2l1.2 2.3 2.3 1.2-2.3 1.2-1.2 2.3-1.2-2.3-2.3-1.2 2.3-1.2z" fill="currentColor" stroke="none"/></svg></span> Builder</div>
+      <div class="nav-item" data-page="settings" onclick="setActivePage('settings', this)"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1.5v1.8M8 12.7v1.8M1.5 8h1.8M12.7 8h1.8M3.4 3.4l1.3 1.3M11.3 11.3l1.3 1.3M12.6 3.4l-1.3 1.3M4.7 11.3l-1.3 1.3" stroke-linecap="round"/></svg></span> Settings</div>
+      <div class="nav-item" data-page="logs" onclick="setActivePage('logs', this)"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4h10M3 8h10M3 12h6" stroke-linecap="round"/></svg></span> Logs</div>
+      <div class="nav-item" data-page="history" onclick="setActivePage('history', this)"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2.5 1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span> History</div>
+      <div class="nav-item" data-page="retention" onclick="setActivePage('retention', this)"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="3" rx="1"/><path d="M3 6v7h10V6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 9.5h4" stroke-linecap="round"/></svg></span> Retention</div>
     </nav>
     <div class="sidebar-footer">
       <div class="status-pill">
@@ -222,16 +221,16 @@
     <div class="page active" id="page-dashboard">
       <div class="page-header">
         <div><div class="page-title">Dashboard</div><div class="page-sub">Overview of your email scanning setup</div></div>
-        <button class="btn btn-ghost" onclick="scanNow()">&#9654; Scan Now</button>
+        <button class="btn btn-ghost"
+          hx-post="/fragments/scan"
+          hx-swap="none">&#9654; Scan Now</button>
       </div>
-      <div class="stats-row">
-        <div class="stat stat-blue"><div class="stat-label">Accounts</div><div class="stat-value accent" id="stat-accounts">—</div></div>
-        <div class="stat stat-green"><div class="stat-label">Active Prompts</div><div class="stat-value accent" id="stat-prompts">—</div></div>
-        <div class="stat stat-muted"><div class="stat-label">Poll Interval</div><div class="stat-value" id="stat-interval">—</div></div>
-        <div class="stat stat-green"><div class="stat-label">Next Scan</div><div class="stat-value green" id="stat-next">—</div></div>
+      <div id="dashboard-content"
+        hx-get="/fragments/dashboard"
+        hx-trigger="load, every 30s"
+        hx-swap="innerHTML">
+        <div class="empty"><div class="empty-icon">&#9670;</div>Loading…</div>
       </div>
-      <div class="form-title">Recent Activity</div>
-      <div id="dashboard-logs" class="log-list"><div class="empty"><div class="empty-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="6" width="24" height="20" rx="2"/><path d="M4 12h24"/><path d="M10 18h4M10 22h8"/></svg></div>No logs yet.</div></div>
     </div>
 
     <!-- Accounts -->
@@ -242,24 +241,26 @@
       </div>
       <div class="panel" id="add-account-panel">
         <div class="panel-title">Connect a Gmail Account</div>
-        <div id="oauth-error-box" class="alert alert-error" style="display:none;"></div>
-        <div id="oauth-success-box" class="alert alert-success" style="display:none;"></div>
         <div>
           <div class="oauth-step" id="oauth-step-1">
             <div class="oauth-step-num">1</div>
             <div class="oauth-step-body">
               <div class="oauth-step-label">Generate authorization link</div>
               <div class="oauth-step-desc">Click below to generate a Google authorization URL.</div>
-              <button class="btn btn-primary" id="btn-gen-url" onclick="startOAuth()">Generate Link</button>
+              <button class="btn btn-primary"
+                hx-post="/fragments/oauth/start"
+                hx-target="#oauth-step-2-body"
+                hx-swap="innerHTML"
+                hx-on:htmx:after-request="if(event.detail.successful) document.getElementById('oauth-step-1').classList.add('done')">Generate Link</button>
             </div>
           </div>
           <div class="oauth-step" id="oauth-step-2">
             <div class="oauth-step-num">2</div>
-            <div class="oauth-step-body">
-              <div class="oauth-step-label">Open the link and approve access</div>
-              <div class="oauth-step-desc">Open the link below in your browser. After approving, your browser will try to open a page that fails to load — that is expected.</div>
-              <div class="url-box" id="auth-url-box"></div>
-              <button class="btn btn-ghost btn-sm" id="btn-copy-url" onclick="copyAuthUrl()" style="display:none;">Copy Link</button>
+            <div id="oauth-step-2-body">
+              <div class="oauth-step-body">
+                <div class="oauth-step-label">Open the link and approve access</div>
+                <div class="oauth-step-desc">Click "Generate Link" first.</div>
+              </div>
             </div>
           </div>
           <div class="oauth-step" id="oauth-step-3">
@@ -267,16 +268,25 @@
             <div class="oauth-step-body">
               <div class="oauth-step-label">Paste the redirect URL</div>
               <div class="oauth-step-desc">After approving, your browser will redirect to <code style="font-family:var(--mono);font-size:11.5px;background:var(--surface2);padding:1px 5px;border-radius:3px;">http://localhost/?code=...</code> which fails to load. Copy the full URL from your address bar and paste it here.</div>
-              <div class="form-group">
-                <input type="text" id="oauth-redirect-url" placeholder="http://localhost/?state=...&code=..." style="font-family:var(--mono);font-size:12px;">
-              </div>
-              <button class="btn btn-primary" id="btn-exchange" onclick="exchangeCode()" disabled>Connect Account</button>
-              <button class="btn btn-ghost" onclick="toggleAddAccount()" style="margin-left:8px;">Cancel</button>
+              <form hx-post="/fragments/oauth/exchange"
+                    hx-target="#accounts-list"
+                    hx-swap="innerHTML">
+                <div class="form-group">
+                  <input type="text" name="url" id="oauth-redirect-url" placeholder="http://localhost/?state=...&code=..." style="font-family:var(--mono);font-size:12px;">
+                </div>
+                <button type="submit" class="btn btn-primary">Connect Account</button>
+                <button type="button" class="btn btn-ghost" onclick="toggleAddAccount()" style="margin-left:8px;">Cancel</button>
+              </form>
             </div>
           </div>
         </div>
       </div>
-      <div id="accounts-list"><div class="empty"><div class="empty-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="16" cy="11" r="6"/><path d="M4 28c0-6.627 5.373-12 12-12s12 5.373 12 12" stroke-linecap="round"/></svg></div>No accounts added yet.</div></div>
+      <div id="accounts-list"
+        hx-get="/fragments/accounts"
+        hx-trigger="load"
+        hx-swap="innerHTML">
+        <div class="empty"><div class="empty-icon">&#9670;</div>Loading…</div>
+      </div>
     </div>
 
     <!-- Prompts -->
@@ -292,55 +302,70 @@
       <!-- Filter bar -->
       <div class="filter-bar">
         <label style="color:var(--muted);font-size:12.5px;">Show rules for:</label>
-        <select id="prompt-filter-account" onchange="loadPrompts()">
+        <select id="prompt-filter-account" name="account_id"
+          hx-get="/fragments/prompts"
+          hx-target="#prompts-list"
+          hx-swap="innerHTML"
+          hx-trigger="change">
           <option value="">All accounts</option>
         </select>
       </div>
 
       <div class="panel" id="add-prompt-panel">
         <div class="panel-title">New Labeling Rule</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Rule name</label>
-            <input type="text" id="new-prompt-name" placeholder="e.g. Urgent emails">
+        <form hx-post="/fragments/prompts"
+              hx-target="#prompts-list"
+              hx-swap="innerHTML"
+              hx-on:htmx:after-request="if(event.detail.successful){ this.reset(); document.getElementById('add-prompt-panel').classList.remove('open'); }">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Rule name</label>
+              <input type="text" name="name" placeholder="e.g. Urgent emails">
+            </div>
+            <div class="form-group">
+              <label>Gmail label to apply</label>
+              <input type="text" name="label_name" placeholder="e.g. AI/Urgent">
+              <div class="form-hint">Label will be created in Gmail if it doesn't exist.</div>
+            </div>
           </div>
           <div class="form-group">
-            <label>Gmail label to apply</label>
-            <input type="text" id="new-prompt-label" placeholder="e.g. AI/Urgent">
-            <div class="form-hint">Label will be created in Gmail if it doesn't exist.</div>
+            <label>Apply to account</label>
+            <select name="account_id" id="new-prompt-account">
+              <option value="">All accounts (global)</option>
+            </select>
+            <div class="form-hint">Global rules run on every account. Account-specific rules only run for that account.</div>
           </div>
-        </div>
-        <div class="form-group">
-          <label>Apply to account</label>
-          <select id="new-prompt-account">
-            <option value="">All accounts (global)</option>
-          </select>
-          <div class="form-hint">Global rules run on every account. Account-specific rules only run for that account.</div>
-        </div>
-        <div class="form-group">
-          <label>Instructions for the AI</label>
-          <textarea id="new-prompt-instructions" rows="3" placeholder="Describe what kind of emails should get this label. Be specific."></textarea>
-        </div>
-        <div class="form-group">
-          <label>Actions when matched</label>
-          <div class="actions-grid">
-            <div class="action-item"><input type="checkbox" id="new-action-archive"><label for="new-action-archive">Archive</label></div>
-            <div class="action-item"><input type="checkbox" id="new-action-spam"><label for="new-action-spam">Send to Spam</label></div>
-            <div class="action-item"><input type="checkbox" id="new-action-trash"><label for="new-action-trash">Trash</label></div>
-            <div class="action-item"><input type="checkbox" id="new-action-mark-read"><label for="new-action-mark-read">Mark as Read</label></div>
+          <div class="form-group">
+            <label>Instructions for the AI</label>
+            <textarea name="instructions" id="new-prompt-instructions" rows="3" placeholder="Describe what kind of emails should get this label. Be specific."></textarea>
           </div>
-        </div>
-        <div class="stop-processing-row">
-          <input type="checkbox" id="new-stop-processing">
-          <label for="new-stop-processing">Stop processing further rules if this one matches</label>
-        </div>
-        <div style="display:flex;gap:10px;margin-top:14px;">
-          <button class="btn btn-primary" onclick="createPrompt()">Save Rule</button>
-          <button class="btn btn-ghost" onclick="toggleAddPrompt()">Cancel</button>
-        </div>
+          <div class="form-group">
+            <label>Actions when matched</label>
+            <div class="actions-grid">
+              <div class="action-item"><input type="checkbox" name="action_archive" value="1" id="new-action-archive"><label for="new-action-archive">Archive</label></div>
+              <div class="action-item"><input type="checkbox" name="action_spam" value="1" id="new-action-spam"><label for="new-action-spam">Send to Spam</label></div>
+              <div class="action-item"><input type="checkbox" name="action_trash" value="1" id="new-action-trash"><label for="new-action-trash">Trash</label></div>
+              <div class="action-item"><input type="checkbox" name="action_mark_read" value="1" id="new-action-mark-read"><label for="new-action-mark-read">Mark as Read</label></div>
+            </div>
+          </div>
+          <div class="stop-processing-row">
+            <input type="checkbox" name="stop_processing" value="1" id="new-stop-processing">
+            <label for="new-stop-processing">Stop processing further rules if this one matches</label>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:14px;">
+            <button type="submit" class="btn btn-primary">Save Rule</button>
+            <button type="button" class="btn btn-ghost" onclick="toggleAddPrompt()">Cancel</button>
+          </div>
+        </form>
       </div>
 
-      <div id="prompts-list"><div class="empty"><div class="empty-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h11l13 13-10 10L4 15V4z" stroke-linejoin="round"/><circle cx="11" cy="11" r="2" fill="currentColor" stroke="none"/></svg></div>No prompts yet. Add one to start labeling.</div></div>
+      <div id="prompts-list"
+        hx-get="/fragments/prompts"
+        hx-trigger="load"
+        hx-include="#prompt-filter-account"
+        hx-swap="innerHTML">
+        <div class="empty"><div class="empty-icon">&#9670;</div>Loading…</div>
+      </div>
     </div>
 
     <!-- Builder -->
@@ -375,22 +400,13 @@
     <div class="page" id="page-settings">
       <div class="page-header">
         <div><div class="page-title">Settings</div><div class="page-sub">Configure scanning behavior</div></div>
-        <button class="btn btn-primary" onclick="saveSettings()">Save Changes</button>
       </div>
       <div class="settings-grid">
-        <div class="card" style="padding:0 22px;">
-          <div class="setting-row">
-            <div><div class="setting-label">Poll interval</div><div class="setting-desc">How often to scan for new emails (seconds). Minimum 30.</div></div>
-            <div class="setting-control"><input type="number" id="setting-poll-interval" min="30" step="30" value="300"></div>
-          </div>
-          <div class="setting-row">
-            <div><div class="setting-label">Ollama model</div><div class="setting-desc">Set via OLLAMA_MODEL in docker-compose.yml</div></div>
-            <div class="setting-control"><span class="tag" id="setting-model">—</span></div>
-          </div>
-          <div class="setting-row" style="border-bottom:none;">
-            <div><div class="setting-label">Ollama host</div><div class="setting-desc">Set via OLLAMA_HOST in docker-compose.yml</div></div>
-            <div class="setting-control"><span class="tag" id="setting-host">—</span></div>
-          </div>
+        <div id="settings-container"
+          hx-get="/fragments/settings"
+          hx-trigger="load"
+          hx-swap="innerHTML">
+          <div class="empty"><div class="empty-icon">&#9670;</div>Loading…</div>
         </div>
       </div>
     </div>
@@ -401,7 +417,10 @@
         <div><div class="page-title">Logs</div><div class="page-sub">Last 100 events</div></div>
         <div style="display:flex;gap:8px;">
           <button class="btn btn-ghost" onclick="toggleLogDownload()">&#8659; Download</button>
-          <button class="btn btn-ghost" onclick="loadLogs()">&#8635; Refresh</button>
+          <button class="btn btn-ghost"
+            hx-get="/fragments/logs"
+            hx-target="#logs-content"
+            hx-swap="innerHTML">&#8635; Refresh</button>
         </div>
       </div>
       <div class="panel" id="log-download-panel">
@@ -418,38 +437,25 @@
         </div>
         <button class="btn btn-primary btn-sm" onclick="downloadLogs()">Download CSV</button>
       </div>
-      <div id="logs-list" class="log-list"><div class="empty"><div class="empty-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 8h20M6 14h20M6 20h14" stroke-linecap="round"/></svg></div>No logs yet.</div></div>
+      <div id="logs-content"
+        hx-get="/fragments/logs"
+        hx-trigger="load"
+        hx-swap="innerHTML">
+        <div class="empty"><div class="empty-icon">&#9670;</div>Loading…</div>
+      </div>
     </div>
 
     <!-- Categorization History -->
     <div class="page" id="page-history">
       <div class="page-header">
         <div><div class="page-title">Categorization History</div><div class="page-sub">Emails recently labeled by your rules</div></div>
-        <button class="btn btn-ghost" onclick="loadHistory()">&#8635; Refresh</button>
       </div>
-      <div class="history-filters">
-        <div class="form-group">
-          <label>Account</label>
-          <select id="hist-filter-account" onchange="loadHistory()">
-            <option value="">All accounts</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Rule</label>
-          <select id="hist-filter-rule" onchange="loadHistory()">
-            <option value="">All rules</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Subject</label>
-          <input type="text" id="hist-filter-subject" placeholder="Search subject…" oninput="debounceHistory()">
-        </div>
-        <div class="form-group">
-          <label>Sender</label>
-          <input type="text" id="hist-filter-sender" placeholder="Search sender…" oninput="debounceHistory()">
-        </div>
-      </div>
-      <div id="hist-count" class="history-count"></div>
+      <form id="hist-filter-form" class="history-filters"
+        hx-get="/fragments/history/filters"
+        hx-trigger="load"
+        hx-swap="innerHTML">
+        <div class="empty"><div class="empty-icon">&#9670;</div>Loading…</div>
+      </form>
       <div class="history-table-wrap">
         <table class="history-table">
           <thead>
@@ -463,7 +469,10 @@
               <th class="col-actions">Actions</th>
             </tr>
           </thead>
-          <tbody id="hist-body">
+          <tbody id="hist-body"
+            hx-get="/fragments/history"
+            hx-trigger="load"
+            hx-swap="innerHTML">
             <tr><td colspan="7"><div class="empty"><div class="empty-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="16" cy="16" r="12"/><path d="M16 10v6l4 3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>No history yet. Labels will appear here after emails are scanned.</div></td></tr>
           </tbody>
         </table>
@@ -477,81 +486,11 @@
       </div>
       <div class="filter-bar" style="margin-bottom:24px;">
         <label>Account</label>
-        <select id="retention-account-select" onchange="loadRetention()">
+        <select id="retention-account-select">
           <option value="">Select an account…</option>
         </select>
       </div>
-      <div id="retention-content" style="display:none;max-width:620px;">
-        <!-- Global rule -->
-        <div class="card" style="margin-bottom:20px;">
-          <div class="form-title">Global Retention</div>
-          <div class="setting-row" style="padding-top:0;">
-            <div>
-              <div class="setting-label">Delete all emails older than</div>
-              <div class="setting-desc">Emails in any folder older than this will be moved to Trash on each scan. Leave disabled to skip.</div>
-            </div>
-            <div class="setting-control" style="display:flex;align-items:center;gap:10px;">
-              <input type="checkbox" id="retention-global-enabled" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;" onchange="toggleGlobalDaysInput()">
-              <input type="number" id="retention-global-value" min="1" step="1" placeholder="1" style="width:70px;text-align:right;" disabled>
-              <select id="retention-global-unit" style="width:90px;" disabled>
-                <option value="days">days</option>
-                <option value="years">years</option>
-              </select>
-            </div>
-          </div>
-          <div style="margin-top:14px;">
-            <button class="btn btn-primary btn-sm" onclick="saveGlobalRetention()">Save</button>
-          </div>
-        </div>
-
-        <!-- Never delete -->
-        <div class="card" style="margin-bottom:20px;">
-          <div class="form-title">Never Delete</div>
-          <div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">Emails with these labels will never be deleted by any retention rule.</div>
-          <div id="label-exemptions-list"></div>
-          <hr class="divider">
-          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
-            <div class="form-group" style="margin:0;flex:1;min-width:180px;">
-              <label for="new-exemption-label">Gmail label</label>
-              <select id="new-exemption-label">
-                <option value="">Select a label…</option>
-              </select>
-            </div>
-            <button class="btn btn-ghost btn-sm" style="margin-bottom:0;flex-shrink:0;align-self:flex-end;" onclick="addExemption()">Never Delete</button>
-          </div>
-        </div>
-
-        <!-- Label rules -->
-        <div class="card">
-          <div class="form-title">Label-Specific Retention</div>
-          <div id="label-retention-list"></div>
-          <hr class="divider">
-          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
-            <div class="form-group" style="margin:0;flex:1;min-width:180px;">
-              <label for="new-retention-label">Gmail label</label>
-              <select id="new-retention-label">
-                <option value="">Select a label…</option>
-              </select>
-            </div>
-            <div class="form-group" style="margin:0;width:80px;">
-              <label for="new-retention-value">Delete after</label>
-              <input type="number" id="new-retention-value" min="1" step="1" placeholder="1">
-            </div>
-            <div class="form-group" style="margin:0;width:100px;">
-              <label>&nbsp;</label>
-              <select id="new-retention-unit">
-                <option value="days">days</option>
-                <option value="years">years</option>
-              </select>
-            </div>
-            <button class="btn btn-primary btn-sm" style="margin-bottom:0;flex-shrink:0;align-self:flex-end;" onclick="addLabelRetention()">Add Rule</button>
-          </div>
-        </div>
-      </div>
-      <div id="retention-empty" style="display:none;" class="empty">
-        <div class="empty-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="6" width="24" height="6" rx="1"/><path d="M6 12v14h20V12"/><path d="M12 18h8" stroke-linecap="round"/></svg></div>
-        No accounts found. Add a Gmail account first.
-      </div>
+      <div id="retention-panel" style="max-width:620px;"></div>
     </div>
 
   </main>
@@ -560,401 +499,67 @@
 <div id="toast"></div>
 
 <script>
-  // ---- State ----
-  let _accounts = [];
-  let _authUrl = null;
-  let _dragSrcId = null;
-  let _retentionLabels = [];
-
-  // ---- Navigation ----
-  function navigate(page, el) {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-    document.getElementById('page-' + page).classList.add('active');
-    el.classList.add('active');
-    if (page === 'accounts') loadAccounts();
-    if (page === 'prompts') { loadAccountSelects(); loadPrompts(); }
-    if (page === 'builder') {}
-    if (page === 'settings') loadSettings();
-    if (page === 'logs') loadLogs();
-    if (page === 'dashboard') loadDashboard();
-    if (page === 'history') loadHistoryFilters();
-    if (page === 'retention') loadRetentionAccounts();
-  }
-
   // ---- Toast ----
-  let toastTimer;
+  let _toastTimer;
   function toast(msg, type = 'success') {
     const el = document.getElementById('toast');
     el.textContent = msg;
     el.className = 'show ' + type;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { el.className = ''; }, 3500);
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => { el.className = ''; }, 3500);
   }
 
-  // ---- Dashboard ----
-  async function loadDashboard() {
-    const [accounts, prompts, settings, status, logs] = await Promise.all([
-      fetch('/api/accounts').then(r => r.json()),
-      fetch('/api/prompts').then(r => r.json()),
-      fetch('/api/settings').then(r => r.json()),
-      fetch('/api/status').then(r => r.json()),
-      fetch('/api/logs?limit=15').then(r => r.json()),
-    ]);
-    _accounts = accounts;
-    document.getElementById('stat-accounts').textContent = accounts.length;
-    document.getElementById('stat-prompts').textContent = prompts.filter(p => p.active).length;
-    document.getElementById('stat-interval').textContent = fmtInterval(settings.poll_interval);
-    if (status.next_run) {
-      const secs = Math.max(0, Math.round(status.next_run - status.current_time));
-      document.getElementById('stat-next').textContent = secs > 0 ? fmtInterval(secs) : 'now';
-    } else {
-      document.getElementById('stat-next').textContent = '—';
-    }
-    renderLogs(logs, 'dashboard-logs');
-    const dot = document.getElementById('pollerDot');
-    const lbl = document.getElementById('pollerLabel');
-    if (status.running) { dot.classList.add('active'); lbl.textContent = 'running'; }
-    else { dot.classList.remove('active'); lbl.textContent = 'stopped'; }
+  // ---- Navigation ----
+  function setActivePage(page, el) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('page-' + page).classList.add('active');
+    el.classList.add('active');
   }
 
-  function fmtInterval(secs) {
-    if (secs >= 3600) return Math.round(secs / 3600) + 'h';
-    if (secs >= 60) return Math.round(secs / 60) + 'm';
-    return secs + 's';
-  }
-
-  // ---- Account selects (shared across pages) ----
-  async function loadAccountSelects() {
-    const accounts = await fetch('/api/accounts').then(r => r.json());
-    _accounts = accounts;
-
-    // Filter dropdown on prompts page
-    const filterSel = document.getElementById('prompt-filter-account');
-    const current = filterSel.value;
-    filterSel.innerHTML = '<option value="">All accounts</option>' +
-      accounts.map(a => `<option value="${a.id}" ${current == a.id ? 'selected' : ''}>${esc(a.email)}</option>`).join('');
-
-    // Account selector in add form
-    const newSel = document.getElementById('new-prompt-account');
-    newSel.innerHTML = '<option value="">All accounts (global)</option>' +
-      accounts.map(a => `<option value="${a.id}">${esc(a.email)}</option>`).join('');
-  }
-
-  // ---- OAuth ----
+  // ---- Panel toggles ----
   function toggleAddAccount() {
-    const panel = document.getElementById('add-account-panel');
-    panel.classList.toggle('open');
-    if (!panel.classList.contains('open')) resetOAuthPanel();
-  }
-
-  function resetOAuthPanel() {
-    _authUrl = null;
-    document.getElementById('auth-url-box').textContent = '';
-    document.getElementById('auth-url-box').classList.remove('visible');
-    document.getElementById('btn-copy-url').style.display = 'none';
-    document.getElementById('oauth-redirect-url').value = '';
-    document.getElementById('btn-exchange').disabled = true;
-    document.getElementById('oauth-error-box').style.display = 'none';
-    document.getElementById('oauth-success-box').style.display = 'none';
-    document.getElementById('btn-gen-url').disabled = false;
-    document.getElementById('btn-gen-url').textContent = 'Generate Link';
-    document.getElementById('oauth-step-1').classList.remove('done');
-  }
-
-  async function startOAuth() {
-    const btn = document.getElementById('btn-gen-url');
-    btn.disabled = true; btn.textContent = 'Generating...';
-    document.getElementById('oauth-error-box').style.display = 'none';
-    const r = await fetch('/api/oauth/start', { method: 'POST' });
-    const data = await r.json();
-    if (data.error) {
-      document.getElementById('oauth-error-box').textContent = data.error;
-      document.getElementById('oauth-error-box').style.display = 'block';
-      btn.disabled = false; btn.textContent = 'Generate Link';
-      return;
-    }
-    _authUrl = data.auth_url;
-    document.getElementById('auth-url-box').textContent = _authUrl;
-    document.getElementById('auth-url-box').classList.add('visible');
-    document.getElementById('btn-copy-url').style.display = 'inline-flex';
-    document.getElementById('btn-exchange').disabled = false;
-    document.getElementById('oauth-step-1').classList.add('done');
-    btn.textContent = 'Regenerate'; btn.disabled = false;
-  }
-
-  function copyAuthUrl() {
-    if (!_authUrl) return;
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(_authUrl).then(() => toast('Link copied to clipboard.'));
-    } else {
-      const ta = document.createElement('textarea');
-      ta.value = _authUrl;
-      ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.focus(); ta.select();
-      try { document.execCommand('copy'); toast('Link copied to clipboard.'); }
-      catch (e) { toast('Copy failed — select and copy the link manually.', 'error'); }
-      document.body.removeChild(ta);
-    }
-  }
-
-  document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('oauth-redirect-url').addEventListener('input', function() {
-      document.getElementById('btn-exchange').disabled = this.value.trim().length < 10;
-    });
-  });
-
-  async function exchangeCode() {
-    const url = document.getElementById('oauth-redirect-url').value.trim();
-    const btn = document.getElementById('btn-exchange');
-    btn.disabled = true; btn.textContent = 'Connecting...';
-    document.getElementById('oauth-error-box').style.display = 'none';
-    const r = await fetch('/api/oauth/exchange', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
-    });
-    const data = await r.json();
-    if (data.error) {
-      document.getElementById('oauth-error-box').textContent = data.error;
-      document.getElementById('oauth-error-box').style.display = 'block';
-      btn.disabled = false; btn.textContent = 'Connect Account';
-      return;
-    }
-    document.getElementById('oauth-success-box').textContent = `Connected: ${data.email}`;
-    document.getElementById('oauth-success-box').style.display = 'block';
-    btn.textContent = 'Connected!';
-    toast(`${data.email} connected.`);
-    setTimeout(() => { toggleAddAccount(); loadAccounts(); }, 1500);
-  }
-
-  // ---- Accounts ----
-  async function loadAccounts() {
-    const accounts = await fetch('/api/accounts').then(r => r.json());
-    _accounts = accounts;
-    const el = document.getElementById('accounts-list');
-    if (!accounts.length) {
-      el.innerHTML = '<div class="empty"><div class="empty-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="16" cy="11" r="6"/><path d="M4 28c0-6.627 5.373-12 12-12s12 5.373 12 12" stroke-linecap="round"/></svg></div>No accounts added yet.</div>';
-      return;
-    }
-    el.innerHTML = accounts.map(a => `
-      <div class="card">
-        <div class="card-row">
-          <div>
-            <div class="card-title">${esc(a.email)}</div>
-            <div class="card-meta">Added ${fmtDate(a.added_at)} &middot; Last scanned ${a.last_scan_at ? fmtDate(a.last_scan_at) : 'never'}</div>
-            ${a.active ? '<span class="badge badge-green">&#9679; active</span>' : '<span class="badge badge-muted">paused</span>'}
-          </div>
-          <div class="card-actions">
-            <button class="btn btn-ghost btn-sm" onclick="toggleAccount(${a.id}, ${a.active})">${a.active ? 'Pause' : 'Resume'}</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteAccount(${a.id})">Remove</button>
-          </div>
-        </div>
-      </div>`).join('');
-  }
-
-  async function toggleAccount(id, current) {
-    const r = await fetch(`/api/accounts/${id}/toggle`, { method: 'POST' });
-    if (!r.ok) { const e = await r.json().catch(() => ({})); toast(e.error || 'Error', 'error'); return; }
-    toast(current ? 'Account paused.' : 'Account resumed.');
-    loadAccounts();
-  }
-
-  async function deleteAccount(id) {
-    if (!confirm('Remove this account? Its processed email history will also be cleared.')) return;
-    const r = await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
-    if (!r.ok) { const e = await r.json().catch(() => ({})); toast(e.error || 'Error', 'error'); return; }
-    toast('Account removed.');
-    loadAccounts();
-  }
-
-  // ---- Prompts ----
-  async function loadPrompts() {
-    const accountId = document.getElementById('prompt-filter-account')?.value || '';
-    const url = accountId ? `/api/prompts?account_id=${accountId}` : '/api/prompts';
-    const prompts = await fetch(url).then(r => r.json());
-    const el = document.getElementById('prompts-list');
-
-    if (!prompts.length) {
-      el.innerHTML = '<div class="empty"><div class="empty-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h11l13 13-10 10L4 15V4z" stroke-linejoin="round"/><circle cx="11" cy="11" r="2" fill="currentColor" stroke="none"/></svg></div>No prompts yet. Add one to start labeling.</div>';
-      return;
-    }
-
-    const accountMap = Object.fromEntries(_accounts.map(a => [a.id, a.email]));
-
-    el.innerHTML = prompts.map(p => {
-      const scope = p.account_id ? `<span class="badge badge-accent" style="margin-left:6px;">${esc(accountMap[p.account_id] || 'account ' + p.account_id)}</span>` : '<span class="badge badge-muted" style="margin-left:6px;">global</span>';
-      const actionBadges = [
-        p.action_archive ? '<span class="badge badge-muted" style="margin-left:6px;">archive</span>' : '',
-        p.action_spam ? '<span class="badge" style="margin-left:6px;background:rgba(239,68,68,0.1);color:var(--red);">spam</span>' : '',
-        p.action_trash ? '<span class="badge badge-muted" style="margin-left:6px;">🗑 trash</span>' : '',
-        p.action_mark_read ? '<span class="badge badge-muted" style="margin-left:6px;">mark read</span>' : '',
-        p.stop_processing ? '<span class="badge badge-stop" style="margin-left:6px;">&#9940; stop</span>' : '',
-      ].join('');
-
-      // Build account options for edit select
-      const accountOptions = '<option value="">All accounts (global)</option>' +
-        _accounts.map(a => `<option value="${a.id}" ${p.account_id == a.id ? 'selected' : ''}>${esc(a.email)}</option>`).join('');
-
-      return `
-      <div class="card" data-id="${p.id}"
-           ondragover="onDragOver(event)"
-           ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
-        <div class="card-row">
-          <div class="drag-handle" title="Drag to reorder" draggable="true" ondragstart="onDragStart(event)" ondragend="onDragEnd(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)">&#9776;</div>
-          <div style="flex:1">
-            <div class="card-title">${esc(p.name)}</div>
-            <div class="card-meta">Created ${fmtDate(p.created_at)}</div>
-            <div style="margin-bottom:10px;">
-              <span class="tag">&#9654; ${esc(p.label_name)}</span>
-              ${p.active ? '<span class="badge badge-green" style="margin-left:6px;">&#9679; active</span>' : '<span class="badge badge-muted" style="margin-left:6px;">paused</span>'}
-              ${scope}${actionBadges}
-            </div>
-            <div id="prompt-view-${p.id}" style="font-size:13px;color:var(--muted);line-height:1.6;">${esc(p.instructions)}</div>
-            <div id="prompt-edit-${p.id}" style="display:none;margin-top:12px;">
-              <div class="form-row" style="margin-bottom:10px;">
-                <div class="form-group">
-                  <label>Rule name</label>
-                  <input type="text" id="edit-name-${p.id}" value="${esc(p.name)}">
-                </div>
-                <div class="form-group">
-                  <label>Gmail label</label>
-                  <input type="text" id="edit-label-${p.id}" value="${esc(p.label_name)}">
-                </div>
-              </div>
-              <div class="form-group">
-                <label>Apply to account</label>
-                <select id="edit-account-${p.id}">${accountOptions}</select>
-              </div>
-              <div class="form-group">
-                <label>Instructions</label>
-                <textarea id="edit-instructions-${p.id}" rows="3">${esc(p.instructions)}</textarea>
-              </div>
-              <div class="form-group">
-                <label>Actions when matched</label>
-                <div class="actions-grid">
-                  <div class="action-item"><input type="checkbox" id="edit-action-archive-${p.id}" ${p.action_archive ? 'checked' : ''}><label for="edit-action-archive-${p.id}">Archive</label></div>
-                  <div class="action-item"><input type="checkbox" id="edit-action-spam-${p.id}" ${p.action_spam ? 'checked' : ''}><label for="edit-action-spam-${p.id}">Send to Spam</label></div>
-                  <div class="action-item"><input type="checkbox" id="edit-action-trash-${p.id}" ${p.action_trash ? 'checked' : ''}><label for="edit-action-trash-${p.id}">Trash</label></div>
-                  <div class="action-item"><input type="checkbox" id="edit-action-mark-read-${p.id}" ${p.action_mark_read ? 'checked' : ''}><label for="edit-action-mark-read-${p.id}">Mark as Read</label></div>
-                </div>
-              </div>
-              <div class="stop-processing-row">
-                <input type="checkbox" id="edit-stop-processing-${p.id}" ${p.stop_processing ? 'checked' : ''}>
-                <label for="edit-stop-processing-${p.id}">Stop processing further rules if this one matches</label>
-              </div>
-              <div style="display:flex;gap:8px;margin-top:14px;">
-                <button class="btn btn-primary btn-sm" onclick="savePrompt(${p.id}, ${p.active})">Save</button>
-                <button class="btn btn-ghost btn-sm" onclick="cancelEdit(${p.id})">Cancel</button>
-              </div>
-            </div>
-          </div>
-          <div class="card-actions" style="align-self:flex-start;">
-            <button class="btn btn-ghost btn-sm" onclick="togglePromptActive(${p.id}, ${p.active})">${p.active ? 'Pause' : 'Resume'}</button>
-            <button class="btn btn-ghost btn-sm" onclick="editPrompt(${p.id})">Edit</button>
-            <button class="btn btn-danger btn-sm" onclick="deletePrompt(${p.id})">Delete</button>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
+    document.getElementById('add-account-panel').classList.toggle('open');
   }
 
   function toggleAddPrompt() {
     document.getElementById('add-prompt-panel').classList.toggle('open');
   }
 
-
-  async function createPrompt() {
-    const name = document.getElementById('new-prompt-name').value.trim();
-    const instructions = document.getElementById('new-prompt-instructions').value.trim();
-    const label_name = document.getElementById('new-prompt-label').value.trim();
-    if (!name || !instructions || !label_name) { toast('All fields are required.', 'error'); return; }
-    const account_id = document.getElementById('new-prompt-account').value || null;
-    const action_archive = document.getElementById('new-action-archive').checked ? 1 : 0;
-    const action_spam = document.getElementById('new-action-spam').checked ? 1 : 0;
-    const action_trash = document.getElementById('new-action-trash')?.checked ? 1 : 0;
-    const action_mark_read = document.getElementById('new-action-mark-read')?.checked ? 1 : 0;
-    const stop_processing = document.getElementById('new-stop-processing').checked ? 1 : 0;
-
-    const r = await fetch('/api/prompts', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, instructions, label_name, account_id, action_archive, action_spam, action_trash, action_mark_read, stop_processing }),
-    });
-    if (r.ok) {
-      toast('Rule created.');
-      ['new-prompt-name','new-prompt-instructions','new-prompt-label'].forEach(id => document.getElementById(id).value = '');
-      ['new-action-archive','new-action-spam','new-action-trash','new-action-mark-read','new-stop-processing'].forEach(id => document.getElementById(id).checked = false);
-      document.getElementById('new-prompt-account').value = '';
-      document.getElementById('add-prompt-panel').classList.remove('open');
-      loadPrompts();
-    } else {
-      const e = await r.json();
-      toast(e.error || 'Error creating rule.', 'error');
+  function toggleLogDownload() {
+    const panel = document.getElementById('log-download-panel');
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open')) {
+      const now = new Date();
+      const yesterday = new Date(now - 86400000);
+      const toLocal = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      document.getElementById('log-dl-end').value = toLocal(now);
+      document.getElementById('log-dl-start').value = toLocal(yesterday);
     }
   }
 
-  function editPrompt(id) {
-    document.getElementById('prompt-view-' + id).style.display = 'none';
-    document.getElementById('prompt-edit-' + id).style.display = 'block';
-  }
-
-  function cancelEdit(id) {
-    document.getElementById('prompt-view-' + id).style.display = 'block';
-    document.getElementById('prompt-edit-' + id).style.display = 'none';
-  }
-
-  async function savePrompt(id, active) {
-    const name = document.getElementById('edit-name-' + id).value.trim();
-    const instructions = document.getElementById('edit-instructions-' + id).value.trim();
-    const label_name = document.getElementById('edit-label-' + id).value.trim();
-    const account_id = document.getElementById('edit-account-' + id)?.value || null;
-    const action_archive = document.getElementById('edit-action-archive-' + id)?.checked ? 1 : 0;
-    const action_spam = document.getElementById('edit-action-spam-' + id)?.checked ? 1 : 0;
-    const action_trash = document.getElementById('edit-action-trash-' + id)?.checked ? 1 : 0;
-    const action_mark_read = document.getElementById('edit-action-mark-read-' + id)?.checked ? 1 : 0;
-    const stop_processing = document.getElementById('edit-stop-processing-' + id)?.checked ? 1 : 0;
-    const r = await fetch(`/api/prompts/${id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, instructions, label_name, active, account_id, action_archive, action_spam, action_trash, action_mark_read, stop_processing }),
-    });
-    if (!r.ok) { const e = await r.json().catch(() => ({})); toast(e.error || 'Error', 'error'); return; }
-    toast('Rule updated.');
-    loadPrompts();
-  }
-
-  async function togglePromptActive(id, current) {
-    const prompts = await fetch('/api/prompts').then(r => r.json());
-    const p = prompts.find(x => x.id === id);
-    if (!p) return;
-    const r = await fetch(`/api/prompts/${id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: p.name, instructions: p.instructions, label_name: p.label_name, active: current ? 0 : 1, account_id: p.account_id, action_archive: p.action_archive, action_spam: p.action_spam, action_trash: p.action_trash, action_mark_read: p.action_mark_read, stop_processing: p.stop_processing }),
-    });
-    if (!r.ok) { const e = await r.json().catch(() => ({})); toast(e.error || 'Error', 'error'); return; }
-    toast(current ? 'Rule paused.' : 'Rule resumed.');
-    loadPrompts();
-  }
-
-  async function deletePrompt(id) {
-    if (!confirm('Delete this rule?')) return;
-    const r = await fetch(`/api/prompts/${id}`, { method: 'DELETE' });
-    if (!r.ok) { const e = await r.json().catch(() => ({})); toast(e.error || 'Error', 'error'); return; }
-    toast('Rule deleted.');
-    loadPrompts();
-  }
-
-  // ---- Export ----
+  // ---- Export prompts (file download, no HTMX equivalent) ----
   function exportPrompts() {
     const accountId = document.getElementById('prompt-filter-account')?.value || '';
-    const account = _accounts.find(a => a.id == accountId);
-    const name = account ? account.email : 'all';
     const url = accountId
-      ? `/api/prompts/export?account_id=${accountId}&name=${encodeURIComponent(name)}`
+      ? `/api/prompts/export?account_id=${accountId}&name=${encodeURIComponent(accountId)}`
       : `/api/prompts/export?name=all`;
     window.location.href = url;
   }
 
+  // ---- Download logs (file download, no HTMX equivalent) ----
+  function downloadLogs() {
+    const start = document.getElementById('log-dl-start').value;
+    const end = document.getElementById('log-dl-end').value;
+    if (!start || !end) { toast('Select a start and end time.', 'error'); return; }
+    if (start >= end) { toast('Start must be before end.', 'error'); return; }
+    const toUTC = s => new Date(s).toISOString().replace('T', ' ').slice(0, 19);
+    window.location.href = `/api/logs/download?start=${encodeURIComponent(toUTC(start))}&end=${encodeURIComponent(toUTC(end))}`;
+  }
+
   // ---- Drag to reorder ----
+  let _dragSrcId = null;
+
   function onDragStart(e) {
     const card = e.currentTarget.closest('.card');
     _dragSrcId = parseInt(card.dataset.id);
@@ -998,71 +603,13 @@
     if (!resp.ok) {
       toast('Failed to save order.', 'error');
     } else {
-      loadPrompts();
+      const accountId = document.getElementById('prompt-filter-account')?.value || '';
+      const url = accountId ? `/fragments/prompts?account_id=${accountId}` : '/fragments/prompts';
+      htmx.ajax('GET', url, { target: '#prompts-list', swap: 'innerHTML' });
     }
   }
 
-  // ---- Settings ----
-  async function loadSettings() {
-    const s = await fetch('/api/settings').then(r => r.json());
-    document.getElementById('setting-poll-interval').value = s.poll_interval;
-    document.getElementById('setting-model').textContent = s.ollama_model;
-    document.getElementById('setting-host').textContent = s.ollama_host;
-  }
-
-  async function saveSettings() {
-    const poll_interval = parseInt(document.getElementById('setting-poll-interval').value, 10);
-    const r = await fetch('/api/settings', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ poll_interval }),
-    });
-    if (r.ok) { toast('Settings saved.'); }
-    else { const e = await r.json(); toast(e.error || 'Error', 'error'); }
-  }
-
-  // ---- Logs ----
-  async function loadLogs() {
-    const logs = await fetch('/api/logs?limit=100').then(r => r.json());
-    renderLogs(logs, 'logs-list');
-  }
-
-  function toggleLogDownload() {
-    const panel = document.getElementById('log-download-panel');
-    panel.classList.toggle('open');
-    if (panel.classList.contains('open')) {
-      const now = new Date();
-      const yesterday = new Date(now - 86400000);
-      const toLocal = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-      document.getElementById('log-dl-end').value = toLocal(now);
-      document.getElementById('log-dl-start').value = toLocal(yesterday);
-    }
-  }
-
-  function downloadLogs() {
-    const start = document.getElementById('log-dl-start').value;
-    const end = document.getElementById('log-dl-end').value;
-    if (!start || !end) { toast('Select a start and end time.', 'error'); return; }
-    if (start >= end) { toast('Start must be before end.', 'error'); return; }
-    // Convert local datetime-local values to SQLite-compatible UTC strings
-    const toUTC = s => new Date(s).toISOString().replace('T', ' ').slice(0, 19);
-    window.location.href = `/api/logs/download?start=${encodeURIComponent(toUTC(start))}&end=${encodeURIComponent(toUTC(end))}`;
-  }
-
-  function renderLogs(logs, containerId) {
-    const el = document.getElementById(containerId);
-    if (!logs.length) {
-      el.innerHTML = '<div class="empty"><div class="empty-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 8h20M6 14h20M6 20h14" stroke-linecap="round"/></svg></div>No logs yet.</div>';
-      return;
-    }
-    el.innerHTML = logs.map(l => `
-      <div class="log-entry ${l.level}">
-        <span class="log-time">${fmtDate(l.timestamp)}</span>
-        <span class="log-level ${l.level}">${l.level}</span>
-        <span class="log-msg">${esc(l.message)}</span>
-      </div>`).join('');
-  }
-
-  // ---- Builder ----
+  // ---- Builder SSE (keep as-is; POST-triggered SSE doesn't fit htmx-sse) ----
   async function generatePrompt() {
     const description = document.getElementById('builder-description').value.trim();
     if (!description) { toast('Describe the emails first.', 'error'); return; }
@@ -1117,295 +664,111 @@
     const instruction = document.getElementById('builder-instruction').value.trim();
     if (!instruction) return;
     const promptsNav = document.querySelector('.nav-item[data-page="prompts"]');
-    navigate('prompts', promptsNav);
-    const panel = document.getElementById('add-prompt-panel');
-    if (!panel.classList.contains('open')) panel.classList.add('open');
-    document.getElementById('new-prompt-instructions').value = instruction;
-    document.getElementById('new-prompt-instructions').scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-
-  // ---- Scan now ----
-  async function scanNow() {
-    const r = await fetch('/api/scan', { method: 'POST' });
-    if (!r.ok) { const e = await r.json().catch(() => ({})); toast(e.error || 'Error', 'error'); return; }
-    toast('Scan triggered. Check logs for results.');
-    setTimeout(loadDashboard, 2000);
-  }
-
-  // ---- History ----
-  let _histDebounce = null;
-
-  function debounceHistory() {
-    clearTimeout(_histDebounce);
-    _histDebounce = setTimeout(loadHistory, 350);
-  }
-
-  async function loadHistoryFilters() {
-    if (!_accounts.length) {
-      _accounts = await fetch('/api/accounts').then(r => r.json());
-    }
-    const accountSel = document.getElementById('hist-filter-account');
-    const curAccount = accountSel.value;
-    accountSel.innerHTML = '<option value="">All accounts</option>' +
-      _accounts.map(a => `<option value="${a.id}" ${curAccount == a.id ? 'selected' : ''}>${esc(a.email)}</option>`).join('');
-
-    const ruleSel = document.getElementById('hist-filter-rule');
-    const curRule = ruleSel.value;
-    const prompts = await fetch('/api/prompts').then(r => r.json());
-    ruleSel.innerHTML = '<option value="">All rules</option>' +
-      prompts.map(p => `<option value="${p.id}" ${curRule == p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
-
-    loadHistory();
-  }
-
-  async function loadHistory() {
-    const accountId = document.getElementById('hist-filter-account')?.value || '';
-    const promptId = document.getElementById('hist-filter-rule')?.value || '';
-    const subject = document.getElementById('hist-filter-subject')?.value || '';
-    const sender = document.getElementById('hist-filter-sender')?.value || '';
-    const params = new URLSearchParams();
-    if (accountId) params.set('account_id', accountId);
-    if (promptId) params.set('prompt_id', promptId);
-    if (subject) params.set('subject', subject);
-    if (sender) params.set('sender', sender);
-    const rows = await fetch('/api/history?' + params.toString()).then(r => r.json());
-    renderHistory(rows);
-  }
-
-  function renderHistory(rows) {
-    const tbody = document.getElementById('hist-body');
-    const countEl = document.getElementById('hist-count');
-    if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="empty-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="16" cy="16" r="12"/><path d="M16 10v6l4 3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>No matching history found.</div></td></tr>';
-      countEl.textContent = '';
-      return;
-    }
-    countEl.textContent = `${rows.length} result${rows.length === 1 ? '' : 's'}`;
-    tbody.innerHTML = rows.map(r => {
-      const extraActions = (r.actions || '').split(',').map(a => a.trim())
-        .filter(a => a && !a.startsWith('labeled \u2192'));
-      const actionBadges = extraActions.map(a => `<span class="badge badge-muted" style="margin-right:3px;">${esc(a)}</span>`).join('');
-      return `<tr>
-        <td class="col-time">${fmtDate(r.timestamp)}</td>
-        <td class="col-account" title="${esc(r.account_email)}">${esc(r.account_email)}</td>
-        <td class="col-subject">${esc(r.subject || '(no subject)')}</td>
-        <td class="col-sender" title="${esc(r.sender)}">${esc(r.sender || '—')}</td>
-        <td class="col-rule" title="${esc(r.prompt_name)}">${esc(r.prompt_name)}</td>
-        <td class="col-label"><span class="tag">${esc(r.label_name)}</span></td>
-        <td class="col-actions">${actionBadges || '<span style="color:var(--muted)">—</span>'}</td>
-      </tr>`;
-    }).join('');
-  }
-
-  // ---- Retention ----
-  async function loadRetentionAccounts() {
-    if (!_accounts.length) {
-      _accounts = await fetch('/api/accounts').then(r => r.json());
-    }
-    const sel = document.getElementById('retention-account-select');
-    const current = sel.value;
-    sel.innerHTML = '<option value="">Select an account…</option>' +
-      _accounts.map(a => `<option value="${a.id}" ${current == a.id ? 'selected' : ''}>${esc(a.email)}</option>`).join('');
-    if (!_accounts.length) {
-      document.getElementById('retention-empty').style.display = 'block';
-      document.getElementById('retention-content').style.display = 'none';
+    setActivePage('prompts', promptsNav);
+    // Populate the add-prompt form after the prompts page content is ready
+    const list = document.getElementById('prompts-list');
+    const doPopulate = () => {
+      const panel = document.getElementById('add-prompt-panel');
+      if (!panel.classList.contains('open')) panel.classList.add('open');
+      const ta = document.getElementById('new-prompt-instructions');
+      if (ta) { ta.value = instruction; ta.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    };
+    // If prompts-list already has content, populate immediately; else wait for swap
+    if (list && list.querySelector('.card, .empty')) {
+      doPopulate();
     } else {
-      document.getElementById('retention-empty').style.display = 'none';
-      if (!sel.value && _accounts.length) {
-        sel.value = _accounts[0].id;
+      list.addEventListener('htmx:afterSwap', function handler() {
+        list.removeEventListener('htmx:afterSwap', handler);
+        doPopulate();
+      });
+    }
+  }
+
+  // ---- Copy OAuth URL ----
+  function copyAuthUrl(btn) {
+    const urlBox = btn.previousElementSibling;
+    const url = urlBox.dataset.url;
+    if (!url) return;
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(url).then(() => toast('Link copied to clipboard.'));
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      try { document.execCommand('copy'); toast('Link copied to clipboard.'); }
+      catch (e) { toast('Copy failed — select and copy the link manually.', 'error'); }
+      document.body.removeChild(ta);
+    }
+  }
+
+  // ---- Populate account selects (prompts add form + retention) ----
+  async function _loadAccountOptions() {
+    const accounts = await fetch('/api/accounts').then(r => r.json());
+    const sel = document.getElementById('new-prompt-account');
+    if (sel) {
+      sel.innerHTML = '<option value="">All accounts (global)</option>' +
+        accounts.map(a => `<option value="${a.id}">${a.email.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</option>`).join('');
+    }
+    const filterSel = document.getElementById('prompt-filter-account');
+    if (filterSel) {
+      const cur = filterSel.value;
+      filterSel.innerHTML = '<option value="">All accounts</option>' +
+        accounts.map(a => `<option value="${a.id}" ${cur == a.id ? 'selected' : ''}>${a.email.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</option>`).join('');
+    }
+    const retSel = document.getElementById('retention-account-select');
+    if (retSel) {
+      const cur = retSel.value;
+      retSel.innerHTML = '<option value="">Select an account…</option>' +
+        accounts.map(a => `<option value="${a.id}" ${cur == a.id ? 'selected' : ''}>${a.email.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</option>`).join('');
+      if (!cur && accounts.length) {
+        retSel.value = accounts[0].id;
+        retSel.dispatchEvent(new Event('change'));
+      } else if (cur) {
+        retSel.dispatchEvent(new Event('change'));
       }
-      if (sel.value) loadRetention();
     }
   }
 
-  function daysToDisplay(days) {
-    if (days >= 365 && days % 365 === 0) return { value: days / 365, unit: 'years' };
-    return { value: days, unit: 'days' };
-  }
-  function displayToDays(value, unit) {
-    return unit === 'years' ? value * 365 : value;
-  }
-  function fmtRetentionDays(days) {
-    const { value, unit } = daysToDisplay(days);
-    if (unit === 'years') return `${value} ${value === 1 ? 'year' : 'years'}`;
-    return `${value} ${value === 1 ? 'day' : 'days'}`;
-  }
-
-  async function loadRetention() {
-    const accountId = document.getElementById('retention-account-select').value;
-    if (!accountId) {
-      document.getElementById('retention-content').style.display = 'none';
-      return;
-    }
-    document.getElementById('retention-content').style.display = 'block';
-    const [data, gmailLabels] = await Promise.all([
-      fetch(`/api/retention/${accountId}`).then(r => r.json()),
-      fetch(`/api/accounts/${accountId}/labels`).then(r => r.json()).catch(() => []),
-    ]);
-    _retentionLabels = Array.isArray(gmailLabels) ? gmailLabels : [];
-
-    const globalEnabled = document.getElementById('retention-global-enabled');
-    const globalValue = document.getElementById('retention-global-value');
-    const globalUnit = document.getElementById('retention-global-unit');
-    if (data.global_days) {
-      const { value, unit } = daysToDisplay(data.global_days);
-      globalEnabled.checked = true;
-      globalValue.disabled = false;
-      globalUnit.disabled = false;
-      globalValue.value = value;
-      globalUnit.value = unit;
-    } else {
-      globalEnabled.checked = false;
-      globalValue.disabled = true;
-      globalUnit.disabled = true;
-      globalValue.value = '';
-      globalUnit.value = 'days';
-    }
-
-    renderExemptionsList(data.exemptions || [], accountId);
-    renderLabelRetentionList(data.labels, accountId, data.exemptions || []);
-  }
-
-  function toggleGlobalDaysInput() {
-    const enabled = document.getElementById('retention-global-enabled').checked;
-    document.getElementById('retention-global-value').disabled = !enabled;
-    document.getElementById('retention-global-unit').disabled = !enabled;
-    if (!enabled) {
-      document.getElementById('retention-global-value').value = '';
-      document.getElementById('retention-global-unit').value = 'days';
-    }
-  }
-
-  async function saveGlobalRetention() {
-    const accountId = document.getElementById('retention-account-select').value;
-    if (!accountId) return;
-    const enabled = document.getElementById('retention-global-enabled').checked;
-    const value = parseInt(document.getElementById('retention-global-value').value, 10);
-    const unit = document.getElementById('retention-global-unit').value;
-    if (enabled && (!value || value < 1)) { toast('Enter a valid number.', 'error'); return; }
-    const days = enabled ? displayToDays(value, unit) : null;
-    const body = { global_days: days };
-    const r = await fetch(`/api/retention/${accountId}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+  // ---- Retention account selector ----
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('retention-account-select').addEventListener('change', function() {
+      const id = this.value;
+      if (id) {
+        htmx.ajax('GET', `/fragments/retention/${id}`, { target: '#retention-panel', swap: 'innerHTML' });
+      } else {
+        document.getElementById('retention-panel').innerHTML = '';
+      }
     });
-    if (r.ok) { toast(enabled ? `Global retention set to ${fmtRetentionDays(days)}.` : 'Global retention disabled.'); }
-    else { const e = await r.json(); toast(e.error || 'Error', 'error'); }
-  }
+  });
 
-  function populateLabelDropdown(existingRules, exemptions) {
-    const takenByRule = new Set(existingRules.map(r => r.label_name.toLowerCase()));
-    const takenByExempt = new Set((exemptions || []).map(e => e.label_name.toLowerCase()));
-    const available = _retentionLabels.filter(l => !takenByRule.has(l.name.toLowerCase()) && !takenByExempt.has(l.name.toLowerCase()));
-    const sel = document.getElementById('new-retention-label');
-    sel.innerHTML = available.length
-      ? '<option value="">Select a label…</option>' + available.map(l => `<option value="${esc(l.name)}">${esc(l.name)}</option>`).join('')
-      : '<option value="">No labels available</option>';
-  }
+  // ---- HX-Trigger event handlers ----
+  document.body.addEventListener('showToast', function(e) {
+    const { message, type } = e.detail || {};
+    if (message) toast(message, type || 'success');
+  });
 
-  function populateExemptionDropdown(exemptions, existingRules) {
-    const takenByExempt = new Set((exemptions || []).map(e => e.label_name.toLowerCase()));
-    const takenByRule = new Set(existingRules.map(r => r.label_name.toLowerCase()));
-    const available = _retentionLabels.filter(l => !takenByExempt.has(l.name.toLowerCase()) && !takenByRule.has(l.name.toLowerCase()));
-    const sel = document.getElementById('new-exemption-label');
-    sel.innerHTML = available.length
-      ? '<option value="">Select a label…</option>' + available.map(l => `<option value="${esc(l.name)}">${esc(l.name)}</option>`).join('')
-      : '<option value="">No labels available</option>';
-  }
+  document.body.addEventListener('closeOAuthPanel', function() {
+    document.getElementById('add-account-panel').classList.remove('open');
+    // Reset step 2 back to placeholder
+    document.getElementById('oauth-step-2-body').innerHTML =
+      '<div class="oauth-step-body"><div class="oauth-step-label">Open the link and approve access</div><div class="oauth-step-desc">Click "Generate Link" first.</div></div>';
+    document.getElementById('oauth-step-1').classList.remove('done');
+  });
 
-  function renderExemptionsList(exemptions, accountId) {
-    const el = document.getElementById('label-exemptions-list');
-    if (!exemptions.length) {
-      el.innerHTML = '<div class="empty" style="padding:16px 0 6px;"><div class="empty-icon"><svg width="24" height="24" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="6" width="24" height="6" rx="1"/><path d="M6 12v14h20V12"/><path d="M12 18h8" stroke-linecap="round"/></svg></div>No exemptions yet.</div>';
-    } else {
-      el.innerHTML = exemptions.map(e => `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
-          <div>
-            <span class="tag">${esc(e.label_name)}</span>
-            <span style="font-size:13px;color:var(--muted);margin-left:10px;">never deleted</span>
-          </div>
-          <button class="btn btn-danger btn-sm" onclick="deleteExemption(${accountId}, ${e.id})">Remove</button>
-        </div>`).join('');
-    }
-  }
-
-  function renderLabelRetentionList(labels, accountId, exemptions) {
-    const el = document.getElementById('label-retention-list');
-    if (!labels.length) {
-      el.innerHTML = '<div class="empty" style="padding:20px 0 10px;"><div class="empty-icon"><svg width="24" height="24" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="6" width="24" height="6" rx="1"/><path d="M6 12v14h20V12"/><path d="M12 18h8" stroke-linecap="round"/></svg></div>No label rules yet.</div>';
-    } else {
-      el.innerHTML = labels.map(r => `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
-          <div>
-            <span class="tag">${esc(r.label_name)}</span>
-            <span style="font-size:13px;color:var(--muted);margin-left:10px;">→ trash after <strong style="color:var(--text);">${fmtRetentionDays(r.days)}</strong></span>
-          </div>
-          <button class="btn btn-danger btn-sm" onclick="deleteLabelRetention(${accountId}, ${r.id})">Remove</button>
-        </div>`).join('');
-    }
-    populateLabelDropdown(labels, exemptions);
-    populateExemptionDropdown(exemptions, labels);
-  }
-
-  async function addExemption() {
-    const accountId = document.getElementById('retention-account-select').value;
-    if (!accountId) return;
-    const label = document.getElementById('new-exemption-label').value;
-    if (!label) { toast('Select a label.', 'error'); return; }
-    const r = await fetch(`/api/retention/${accountId}/exemptions`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label_name: label }),
+  // Populate account selects when prompts/retention pages become active
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const page = item.dataset.page;
+      if (page === 'prompts' || page === 'retention' || page === 'accounts') {
+        _loadAccountOptions();
+      }
     });
-    if (r.ok) { toast(`"${label}" will never be deleted.`); loadRetention(); }
-    else { const e = await r.json(); toast(e.error || 'Error', 'error'); }
-  }
+  });
 
-  async function deleteExemption(accountId, exemptionId) {
-    const r = await fetch(`/api/retention/${accountId}/exemptions/${exemptionId}`, { method: 'DELETE' });
-    if (r.ok) { toast('Exemption removed.'); loadRetention(); }
-    else { toast('Error removing exemption.', 'error'); }
-  }
-
-  async function addLabelRetention() {
-    const accountId = document.getElementById('retention-account-select').value;
-    if (!accountId) return;
-    const label = document.getElementById('new-retention-label').value;
-    const value = parseInt(document.getElementById('new-retention-value').value, 10);
-    const unit = document.getElementById('new-retention-unit').value;
-    if (!label) { toast('Select a label.', 'error'); return; }
-    if (!value || value < 1) { toast('Enter a valid number.', 'error'); return; }
-    const days = displayToDays(value, unit);
-    const r = await fetch(`/api/retention/${accountId}/labels`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label_name: label, days }),
-    });
-    if (r.ok) {
-      document.getElementById('new-retention-value').value = '';
-      document.getElementById('new-retention-unit').value = 'days';
-      toast(`Rule added: "${label}" → ${fmtRetentionDays(days)}.`);
-      loadRetention();
-    } else { const e = await r.json(); toast(e.error || 'Error', 'error'); }
-  }
-
-  async function deleteLabelRetention(accountId, ruleId) {
-    const r = await fetch(`/api/retention/${accountId}/labels/${ruleId}`, { method: 'DELETE' });
-    if (r.ok) { toast('Rule removed.'); loadRetention(); }
-    else { toast('Error removing rule.', 'error'); }
-  }
-
-  // ---- Helpers ----
-  function esc(str) {
-    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-  function fmtDate(str) {
-    if (!str) return '—';
-    const d = new Date(str.endsWith('Z') ? str : str + 'Z');
-    return d.toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
-  }
-
-  // ---- Init ----
-  loadDashboard();
-  setInterval(loadDashboard, 30000);
+  // Initial load of account selects for prompts page (active on load)
+  _loadAccountOptions();
 </script>
 </body>
 </html>

@@ -1,0 +1,46 @@
+<div class="form-group">
+  <label>Account</label>
+  <select name="account_id" id="hist-filter-account"
+    hx-get="/fragments/history"
+    hx-target="#hist-body"
+    hx-swap="innerHTML"
+    hx-trigger="change"
+    hx-include="#hist-filter-form">
+    <option value="">All accounts</option>
+    {% for a in accounts %}
+    <option value="{{ a.id }}">{{ a.email|e }}</option>
+    {% endfor %}
+  </select>
+</div>
+<div class="form-group">
+  <label>Rule</label>
+  <select name="prompt_id" id="hist-filter-rule"
+    hx-get="/fragments/history"
+    hx-target="#hist-body"
+    hx-swap="innerHTML"
+    hx-trigger="change"
+    hx-include="#hist-filter-form">
+    <option value="">All rules</option>
+    {% for p in prompts %}
+    <option value="{{ p.id }}">{{ p.name|e }}</option>
+    {% endfor %}
+  </select>
+</div>
+<div class="form-group">
+  <label>Subject</label>
+  <input type="text" name="subject" id="hist-filter-subject" placeholder="Search subject…"
+    hx-get="/fragments/history"
+    hx-target="#hist-body"
+    hx-swap="innerHTML"
+    hx-trigger="input delay:350ms"
+    hx-include="#hist-filter-form">
+</div>
+<div class="form-group">
+  <label>Sender</label>
+  <input type="text" name="sender" id="hist-filter-sender" placeholder="Search sender…"
+    hx-get="/fragments/history"
+    hx-target="#hist-body"
+    hx-swap="innerHTML"
+    hx-trigger="input delay:350ms"
+    hx-include="#hist-filter-form">
+</div>

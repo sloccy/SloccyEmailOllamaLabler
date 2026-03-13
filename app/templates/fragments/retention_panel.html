@@ -1,0 +1,145 @@
+{% set global_enabled = retention.global_days is not none %}
+{% if global_enabled %}
+  {% set gd = retention.global_days %}
+  {% set g_unit = 'years' if (gd >= 365 and gd % 365 == 0) else 'days' %}
+  {% set g_value = (gd // 365) if g_unit == 'years' else gd %}
+{% else %}
+  {% set g_unit = 'days' %}
+  {% set g_value = '' %}
+{% endif %}
+
+<!-- Global rule -->
+<div class="card" style="margin-bottom:20px;">
+  <div class="form-title">Global Retention</div>
+  <form hx-post="/fragments/retention/{{ account_id }}"
+        hx-target="#retention-panel"
+        hx-swap="innerHTML">
+    <div class="setting-row" style="padding-top:0;">
+      <div>
+        <div class="setting-label">Delete all emails older than</div>
+        <div class="setting-desc">Emails in any folder older than this will be moved to Trash on each scan. Leave disabled to skip.</div>
+      </div>
+      <div class="setting-control" style="display:flex;align-items:center;gap:10px;">
+        <input type="checkbox" name="enabled" value="1" id="retention-global-enabled" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;"
+          {% if global_enabled %}checked{% endif %}
+          onchange="var v=document.getElementById('rg-value'),u=document.getElementById('rg-unit');v.disabled=!this.checked;u.disabled=!this.checked;if(!this.checked){v.value='';u.value='days';}">
+        <input type="number" name="value" id="rg-value" min="1" step="1" placeholder="1" style="width:70px;text-align:right;" value="{{ g_value }}" {% if not global_enabled %}disabled{% endif %}>
+        <select name="unit" id="rg-unit" style="width:90px;" {% if not global_enabled %}disabled{% endif %}>
+          <option value="days" {% if g_unit == 'days' %}selected{% endif %}>days</option>
+          <option value="years" {% if g_unit == 'years' %}selected{% endif %}>years</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:14px;">
+      <button type="submit" class="btn btn-primary btn-sm">Save</button>
+    </div>
+  </form>
+</div>
+
+<!-- Never delete -->
+<div class="card" style="margin-bottom:20px;">
+  <div class="form-title">Never Delete</div>
+  <div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">Emails with these labels will never be deleted by any retention rule.</div>
+  <div id="label-exemptions-list">
+    {% if retention.exemptions %}
+      {% for ex in retention.exemptions %}
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
+        <div>
+          <span class="tag">{{ ex.label_name|e }}</span>
+          <span style="font-size:13px;color:var(--muted);margin-left:10px;">never deleted</span>
+        </div>
+        <button class="btn btn-danger btn-sm"
+          hx-delete="/fragments/retention/{{ account_id }}/exemptions/{{ ex.id }}"
+          hx-target="#retention-panel"
+          hx-swap="innerHTML"
+          hx-confirm="Remove this exemption?">Remove</button>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty" style="padding:16px 0 6px;">
+        <div class="empty-icon"><svg width="24" height="24" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="6" width="24" height="6" rx="1"/><path d="M6 12v14h20V12"/><path d="M12 18h8" stroke-linecap="round"/></svg></div>
+        No exemptions yet.
+      </div>
+    {% endif %}
+  </div>
+  <hr class="divider">
+  <form hx-post="/fragments/retention/{{ account_id }}/exemptions"
+        hx-target="#retention-panel"
+        hx-swap="innerHTML"
+        style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+    <div class="form-group" style="margin:0;flex:1;min-width:180px;">
+      <label>Gmail label</label>
+      <select name="label_name">
+        <option value="">Select a label…</option>
+        {% set taken = retention.exemptions|map(attribute='label_name')|map('lower')|list %}
+        {% set taken_rules = retention.labels|map(attribute='label_name')|map('lower')|list %}
+        {% for l in gmail_labels %}
+          {% if l.name|lower not in taken and l.name|lower not in taken_rules %}
+          <option value="{{ l.name|e }}">{{ l.name|e }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-ghost btn-sm" style="margin-bottom:0;flex-shrink:0;align-self:flex-end;">Never Delete</button>
+  </form>
+</div>
+
+<!-- Label rules -->
+<div class="card">
+  <div class="form-title">Label-Specific Retention</div>
+  <div id="label-retention-list">
+    {% if retention.labels %}
+      {% for rule in retention.labels %}
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
+        <div>
+          <span class="tag">{{ rule.label_name|e }}</span>
+          <span style="font-size:13px;color:var(--muted);margin-left:10px;">→ trash after
+            <strong style="color:var(--text);">{{ rule.days|fmtretention }}</strong>
+          </span>
+        </div>
+        <button class="btn btn-danger btn-sm"
+          hx-delete="/fragments/retention/{{ account_id }}/labels/{{ rule.id }}"
+          hx-target="#retention-panel"
+          hx-swap="innerHTML"
+          hx-confirm="Remove this rule?">Remove</button>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty" style="padding:20px 0 10px;">
+        <div class="empty-icon"><svg width="24" height="24" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="6" width="24" height="6" rx="1"/><path d="M6 12v14h20V12"/><path d="M12 18h8" stroke-linecap="round"/></svg></div>
+        No label rules yet.
+      </div>
+    {% endif %}
+  </div>
+  <hr class="divider">
+  <form hx-post="/fragments/retention/{{ account_id }}/labels"
+        hx-target="#retention-panel"
+        hx-swap="innerHTML"
+        style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+    <div class="form-group" style="margin:0;flex:1;min-width:180px;">
+      <label>Gmail label</label>
+      <select name="label_name">
+        <option value="">Select a label…</option>
+        {% set taken_rules = retention.labels|map(attribute='label_name')|map('lower')|list %}
+        {% set taken_ex = retention.exemptions|map(attribute='label_name')|map('lower')|list %}
+        {% for l in gmail_labels %}
+          {% if l.name|lower not in taken_rules and l.name|lower not in taken_ex %}
+          <option value="{{ l.name|e }}">{{ l.name|e }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group" style="margin:0;width:80px;">
+      <label>Delete after</label>
+      <input type="number" name="value" min="1" step="1" placeholder="1">
+    </div>
+    <div class="form-group" style="margin:0;width:100px;">
+      <label>&nbsp;</label>
+      <select name="unit">
+        <option value="days">days</option>
+        <option value="years">years</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm" style="margin-bottom:0;flex-shrink:0;align-self:flex-end;">Add Rule</button>
+  </form>
+</div>

@@ -1,0 +1,60 @@
+{% set account_map = {} %}
+{% for a in accounts %}{% set _ = account_map.update({a.id: a.email}) %}{% endfor %}
+<div class="card" id="prompt-card-{{ p.id }}" data-id="{{ p.id }}"
+     ondragover="onDragOver(event)"
+     ondragleave="onDragLeave(event)"
+     ondrop="onDrop(event)">
+  <div class="card-row">
+    <div class="drag-handle" style="color:var(--muted2)">&#9776;</div>
+    <div style="flex:1">
+      <form hx-put="/fragments/prompts/{{ p.id }}"
+            hx-target="#prompts-list"
+            hx-swap="innerHTML">
+        <input type="hidden" name="active" value="{{ p.active }}">
+        <div class="form-row" style="margin-bottom:10px;">
+          <div class="form-group">
+            <label>Rule name</label>
+            <input type="text" name="name" value="{{ p.name|e }}">
+          </div>
+          <div class="form-group">
+            <label>Gmail label</label>
+            <input type="text" name="label_name" value="{{ p.label_name|e }}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Apply to account</label>
+          <select name="account_id">
+            <option value="">All accounts (global)</option>
+            {% for a in accounts %}
+            <option value="{{ a.id }}" {% if p.account_id == a.id %}selected{% endif %}>{{ a.email|e }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Instructions</label>
+          <textarea name="instructions" rows="3">{{ p.instructions|e }}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Actions when matched</label>
+          <div class="actions-grid">
+            <div class="action-item"><input type="checkbox" name="action_archive" value="1" id="ea-archive-{{ p.id }}" {% if p.action_archive %}checked{% endif %}><label for="ea-archive-{{ p.id }}">Archive</label></div>
+            <div class="action-item"><input type="checkbox" name="action_spam" value="1" id="ea-spam-{{ p.id }}" {% if p.action_spam %}checked{% endif %}><label for="ea-spam-{{ p.id }}">Send to Spam</label></div>
+            <div class="action-item"><input type="checkbox" name="action_trash" value="1" id="ea-trash-{{ p.id }}" {% if p.action_trash %}checked{% endif %}><label for="ea-trash-{{ p.id }}">Trash</label></div>
+            <div class="action-item"><input type="checkbox" name="action_mark_read" value="1" id="ea-read-{{ p.id }}" {% if p.action_mark_read %}checked{% endif %}><label for="ea-read-{{ p.id }}">Mark as Read</label></div>
+          </div>
+        </div>
+        <div class="stop-processing-row">
+          <input type="checkbox" name="stop_processing" value="1" id="ea-stop-{{ p.id }}" {% if p.stop_processing %}checked{% endif %}>
+          <label for="ea-stop-{{ p.id }}">Stop processing further rules if this one matches</label>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px;">
+          <button type="submit" class="btn btn-primary btn-sm">Save</button>
+          <button type="button" class="btn btn-ghost btn-sm"
+            hx-get="/fragments/prompts/{{ p.id }}/view"
+            hx-target="#prompt-card-{{ p.id }}"
+            hx-swap="outerHTML">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

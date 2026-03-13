@@ -1,0 +1,31 @@
+{% if rows %}
+  {% for r in rows %}
+  <tr>
+    <td class="col-time">{{ r.timestamp|fmtdate }}</td>
+    <td class="col-account" title="{{ r.account_email|e }}">{{ r.account_email|e }}</td>
+    <td class="col-subject">{{ (r.subject or '(no subject)')|e }}</td>
+    <td class="col-sender" title="{{ (r.sender or '')|e }}">{{ (r.sender or '—')|e }}</td>
+    <td class="col-rule" title="{{ r.prompt_name|e }}">{{ r.prompt_name|e }}</td>
+    <td class="col-label"><span class="tag">{{ r.label_name|e }}</span></td>
+    <td class="col-actions">
+      {% set extra_actions = [] %}
+      {% for act in (r.actions or '').split(',') %}
+        {% set a = act.strip() %}
+        {% if a and not a.startswith('labeled →') %}
+          {% set _ = extra_actions.append(a) %}
+        {% endif %}
+      {% endfor %}
+      {% if extra_actions %}
+        {% for a in extra_actions %}<span class="badge badge-muted" style="margin-right:3px;">{{ a|e }}</span>{% endfor %}
+      {% else %}
+        <span style="color:var(--muted)">—</span>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+{% else %}
+<tr><td colspan="7"><div class="empty">
+  <div class="empty-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="16" cy="16" r="12"/><path d="M16 10v6l4 3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  No matching history found.
+</div></td></tr>
+{% endif %}
