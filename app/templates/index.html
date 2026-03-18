@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OllaMail</title>
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/dist/full.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/daisyui@5/dist/themes.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/dist/full.min.css" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
   <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js" defer></script>
@@ -157,7 +157,7 @@
           </div>
           <div class="u-mb-3">
             <label class="form-label">Instructions for the AI</label>
-            <textarea class="textarea textarea-sm" name="instructions" id="new-prompt-instructions" rows="3" placeholder="Describe what kind of emails should get this label. Be specific."></textarea>
+            <textarea class="textarea textarea-sm" name="instructions" id="new-prompt-instructions" placeholder="Describe what kind of emails should get this label. Be specific."></textarea>
           </div>
           <div class="u-mb-3">
             <label class="form-label">Actions when matched</label>
@@ -196,7 +196,7 @@
       <div style="max-width:600px;">
         <div class="u-mb-3">
           <label class="form-label">Describe the emails you want to label</label>
-          <textarea class="textarea" id="builder-description" rows="4" placeholder="e.g. Promotional emails and newsletters from online stores that I didn't explicitly sign up for..."></textarea>
+          <textarea class="textarea" id="builder-description" placeholder="e.g. Promotional emails and newsletters from online stores that I didn't explicitly sign up for..."></textarea>
         </div>
         <button class="btn btn-primary btn-sm" id="btn-generate" onclick="generatePrompt()">&#9670; Generate Instruction</button>
 
@@ -211,7 +211,7 @@
             </div>
             <h6 class="uppercase u-text-muted text-sm font-semibold border-b u-pb-2 u-mb-3">Generated instruction</h6>
             <div class="u-mb-3">
-              <textarea class="textarea" id="builder-instruction" rows="5" sse-swap="content" hx-swap="beforeend"></textarea>
+              <textarea class="textarea" id="builder-instruction" sse-swap="content" hx-swap="beforeend"></textarea>
               <div class="form-text">Edit if needed, then send it to the Prompts page.</div>
             </div>
           </div>
