@@ -105,7 +105,7 @@
 [data-theme="night"] {
   --card-shadow: 0 2px 8px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.4);
   --card-shadow-hover: 0 8px 24px rgba(0,0,0,0.6), 0 0 0 1px oklch(var(--p) / 0.25);
-  --card-border: 1px solid oklch(var(--bc) / 0.22);
+  --card-border: 1px solid oklch(var(--bc) / 0.30);
   --hover-subtle-bg: rgba(255,255,255,0.04);
   --sidebar-active-bg: rgba(255,255,255,0.08);
   --app-border: oklch(var(--bc) / 0.2);
@@ -178,12 +178,16 @@ html, body { height: 100%; font-size: 14px; }
 
 /* Cards */
 .card {
-  background: color-mix(in oklch, oklch(var(--b2)), white 5%);
-  box-shadow: var(--card-shadow), inset 0 1px 0 0 rgba(255,255,255,0.06);
+  background: color-mix(in oklch, oklch(var(--b2)), white 12%);
+  box-shadow: var(--card-shadow), inset 0 1px 0 0 rgba(255,255,255,0.10);
   border: var(--card-border, 1px solid transparent);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
-.card:hover { box-shadow: var(--card-shadow-hover); transform: translateY(-1px); }
+.card:hover {
+  background: color-mix(in oklch, oklch(var(--b2)), white 16%);
+  box-shadow: var(--card-shadow-hover), inset 0 1px 0 0 rgba(255,255,255,0.10);
+  transform: translateY(-1px);
+}
 .account-card { border-left: 3px solid oklch(var(--bc) / 0.3); }
 .account-card.active {
   border-left-color: oklch(var(--su));
