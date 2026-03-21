@@ -167,8 +167,9 @@
   /* Bulma semantic colors */
   --bulma-primary-h: 225; --bulma-primary-s: 84%; --bulma-primary-l: 62%;
   --bulma-link-h: 225;    --bulma-link-s: 84%;    --bulma-link-l: 62%;
-  --bulma-info-h: 225;    --bulma-info-s: 84%;    --bulma-info-l: 62%;
+  --bulma-info-h: 198;    --bulma-info-s: 72%;    --bulma-info-l: 52%;      /* cyan — actions, "paused", "global" */
   --bulma-success-h: 152; --bulma-success-s: 58%; --bulma-success-l: 50%;
+  --bulma-warning-h: 42;  --bulma-warning-s: 90%; --bulma-warning-l: 55%;
   --bulma-danger-h: 0;    --bulma-danger-s: 72%;  --bulma-danger-l: 51%;
   /* Bulma component theming */
   --bulma-card-background-color: rgba(255, 255, 255, 0.07);
@@ -184,6 +185,17 @@
   --bulma-border-l: 25%;
   --bulma-text-l: 82%;
   --bulma-text-strong-l: 92%;
+}
+
+/* is-light tags: Bulma defaults to near-white bg which is invisible in dark mode */
+[data-theme="dark"] .tag.is-light {
+  background-color: rgba(255, 255, 255, 0.12);
+  color: var(--om-text);
+}
+[data-theme="dark"] .tag.is-light.is-outlined {
+  background-color: transparent;
+  border-color: var(--om-text-30);
+  color: var(--om-text-60);
 }
 
 body { font-family: 'Plus Jakarta Sans', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; letter-spacing: -0.01em; }
