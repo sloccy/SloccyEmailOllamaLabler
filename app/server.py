@@ -1,6 +1,10 @@
+import csv
+import html as _html
+import io
 import json
 import secrets
 import time as _time
+from datetime import datetime, timezone
 from urllib.parse import urlparse, parse_qs
 from flask import Flask, jsonify, request, render_template, session, Response, make_response
 from app import db, gmail_client, poller, llm_client
@@ -26,7 +30,6 @@ def _fmt_interval(secs):
 def _fmt_date(ts):
     if not ts:
         return "—"
-    from datetime import datetime
     try:
         s = ts.replace("Z", "") if ts.endswith("Z") else ts
         d = datetime.fromisoformat(s)
@@ -57,8 +60,8 @@ def fragment_response(template, ctx, toast=None):
     return resp
 
 
-def _safe_accounts(accounts):
-    return [{k: v for k, v in a.items() if k != "credentials_json"} for a in accounts]
+def _safe_accounts():
+    return db.list_accounts_safe()
 
 
 # ---- UI ----
@@ -129,7 +132,6 @@ def api_export_prompts():
 
 @app.route("/api/config/export", methods=["GET"])
 def api_export_config():
-    from datetime import datetime, timezone
     accounts_raw = db.list_accounts()
     account_map = {a["id"]: a["email"] for a in accounts_raw}
 
@@ -153,7 +155,7 @@ def api_export_config():
             "sort_order": p.get("sort_order", 0),
         })
 
-    with db.get_db() as conn:
+    with db.get_db_readonly() as conn:
         settings_rows = conn.execute("SELECT key, value FROM settings").fetchall()
     settings_export = {r["key"]: r["value"] for r in settings_rows
                        if r["key"] != "flask_secret_key"}
@@ -269,7 +271,6 @@ def api_import_config():
 
 @app.route("/api/logs/download", methods=["GET"])
 def api_download_logs():
-    import csv, io
     start = request.args.get("start", "")
     end = request.args.get("end", "")
     logs = db.get_logs_range(start, end)
@@ -290,7 +291,7 @@ def api_download_logs():
 
 @app.route("/fragments/dashboard")
 def frag_dashboard():
-    accounts = _safe_accounts(db.list_accounts())
+    accounts = _safe_accounts()
     prompts = db.list_prompts()
     poll_interval = int(db.get_setting("poll_interval", str(POLL_INTERVAL)))
     status = {**poller.get_status(), "current_time": _time.time()}
@@ -312,14 +313,14 @@ def frag_dashboard():
 
 @app.route("/fragments/accounts")
 def frag_accounts():
-    accounts = _safe_accounts(db.list_accounts())
+    accounts = _safe_accounts()
     return fragment_response("fragments/accounts_list.html", {"accounts": accounts})
 
 
 @app.route("/fragments/accounts/<int:account_id>/toggle", methods=["POST"])
 def frag_toggle_account(account_id):
     new_state = db.toggle_account(account_id)
-    accounts = _safe_accounts(db.list_accounts())
+    accounts = _safe_accounts()
     msg = "Account resumed." if new_state else "Account paused."
     return fragment_response("fragments/accounts_list.html", {"accounts": accounts}, toast=msg)
 
@@ -328,7 +329,7 @@ def frag_toggle_account(account_id):
 def frag_delete_account(account_id):
     db.delete_account(account_id)
     db.add_log("INFO", f"Account {account_id} removed.")
-    accounts = _safe_accounts(db.list_accounts())
+    accounts = _safe_accounts()
     return fragment_response("fragments/accounts_list.html", {"accounts": accounts},
                              toast="Account removed.")
 
@@ -337,7 +338,7 @@ def frag_delete_account(account_id):
 def frag_prompts():
     account_id = request.args.get("account_id", "")
     prompts = db.list_prompts(account_id=int(account_id)) if account_id else db.list_prompts()
-    accounts = _safe_accounts(db.list_accounts())
+    accounts = _safe_accounts()
     return fragment_response("fragments/prompts_list.html",
                              {"prompts": prompts, "accounts": accounts})
 
@@ -351,7 +352,7 @@ def frag_create_prompt():
     if not name or not instructions or not label_name:
         return fragment_response("fragments/prompts_list.html",
                                  {"prompts": db.list_prompts(),
-                                  "accounts": _safe_accounts(db.list_accounts())},
+                                  "accounts": _safe_accounts()},
                                  toast={"message": "name, instructions, and label_name are required",
                                         "type": "error"})
     account_id = f.get("account_id") or None
@@ -368,7 +369,7 @@ def frag_create_prompt():
     scope = f"account {account_id}" if account_id else "all accounts"
     db.add_log("INFO", f"Prompt created: {name} → label '{label_name}' ({scope})")
     prompts = db.list_prompts()
-    accounts = _safe_accounts(db.list_accounts())
+    accounts = _safe_accounts()
     return fragment_response("fragments/prompts_list.html",
                              {"prompts": prompts, "accounts": accounts},
                              toast="Rule created.")
@@ -393,7 +394,7 @@ def frag_update_prompt(prompt_id):
     )
     _ensure_label_for_accounts(int(account_id) if account_id else None, label_name)
     prompts = db.list_prompts()
-    accounts = _safe_accounts(db.list_accounts())
+    accounts = _safe_accounts()
     return fragment_response("fragments/prompts_list.html",
                              {"prompts": prompts, "accounts": accounts},
                              toast="Rule updated.")
@@ -403,7 +404,7 @@ def frag_update_prompt(prompt_id):
 def frag_delete_prompt(prompt_id):
     db.delete_prompt(prompt_id)
     prompts = db.list_prompts()
-    accounts = _safe_accounts(db.list_accounts())
+    accounts = _safe_accounts()
     return fragment_response("fragments/prompts_list.html",
                              {"prompts": prompts, "accounts": accounts},
                              toast="Rule deleted.")
@@ -411,8 +412,7 @@ def frag_delete_prompt(prompt_id):
 
 @app.route("/fragments/prompts/<int:prompt_id>/toggle", methods=["POST"])
 def frag_toggle_prompt(prompt_id):
-    all_prompts = db.list_prompts()
-    p = next((x for x in all_prompts if x["id"] == prompt_id), None)
+    p = db.get_prompt(prompt_id)
     if not p:
         return "", 404
     new_active = 0 if p["active"] else 1
@@ -425,9 +425,8 @@ def frag_toggle_prompt(prompt_id):
         stop_processing=p.get("stop_processing", 0),
         account_id=p.get("account_id"),
     )
-    all_prompts = db.list_prompts()
-    p = next((x for x in all_prompts if x["id"] == prompt_id), p)
-    accounts = _safe_accounts(db.list_accounts())
+    p = db.get_prompt(prompt_id)
+    accounts = _safe_accounts()
     msg = "Rule paused." if not new_active else "Rule resumed."
     return fragment_response("fragments/prompt_card_view.html",
                              {"p": p, "accounts": accounts},
@@ -436,21 +435,19 @@ def frag_toggle_prompt(prompt_id):
 
 @app.route("/fragments/prompts/<int:prompt_id>/edit")
 def frag_prompt_edit(prompt_id):
-    all_prompts = db.list_prompts()
-    p = next((x for x in all_prompts if x["id"] == prompt_id), None)
+    p = db.get_prompt(prompt_id)
     if not p:
         return "", 404
-    accounts = _safe_accounts(db.list_accounts())
+    accounts = _safe_accounts()
     return fragment_response("fragments/prompt_card_edit.html", {"p": p, "accounts": accounts})
 
 
 @app.route("/fragments/prompts/<int:prompt_id>/view")
 def frag_prompt_view(prompt_id):
-    all_prompts = db.list_prompts()
-    p = next((x for x in all_prompts if x["id"] == prompt_id), None)
+    p = db.get_prompt(prompt_id)
     if not p:
         return "", 404
-    accounts = _safe_accounts(db.list_accounts())
+    accounts = _safe_accounts()
     return fragment_response("fragments/prompt_card_view.html", {"p": p, "accounts": accounts})
 
 
@@ -509,7 +506,7 @@ def frag_history():
 
 @app.route("/fragments/history/filters")
 def frag_history_filters():
-    accounts = _safe_accounts(db.list_accounts())
+    accounts = _safe_accounts()
     prompts = db.list_prompts()
     return fragment_response("fragments/history_filters.html",
                              {"accounts": accounts, "prompts": prompts})
@@ -695,7 +692,7 @@ def frag_oauth_exchange():
         email, credentials_json = gmail_client.exchange_code(state, code)
         db.upsert_account(email, credentials_json)
         db.add_log("INFO", f"Account connected: {email}")
-        accounts = _safe_accounts(db.list_accounts())
+        accounts = _safe_accounts()
         resp = make_response(render_template("fragments/accounts_list.html", accounts=accounts))
         resp.headers["HX-Trigger"] = json.dumps({
             "showToast": {"message": f"{email} connected.", "type": "success"},
@@ -723,9 +720,8 @@ def frag_scan():
 
 @app.route("/fragments/account-options")
 def frag_account_options():
-    import html as _html
     opt_type = request.args.get("type", "filter")
-    accounts = _safe_accounts(db.list_accounts())
+    accounts = _safe_accounts()
     if opt_type == "new-prompt":
         first = '<option value="">All accounts (global)</option>'
     elif opt_type == "retention":

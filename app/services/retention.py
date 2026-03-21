@@ -9,10 +9,11 @@ def cleanup_retention(account: dict, creds) -> None:
         retention = db.get_retention(account_id)
         trashed_ids = set()
 
-        exempt_names = {e["label_name"].lower() for e in retention.get("exemptions", [])}
+        exempt_names = {e["label_name"] for e in retention.get("exemptions", [])}
+        exempt_lower = {n.lower() for n in exempt_names}
 
         for rule in retention["labels"]:
-            if rule["label_name"].lower() in exempt_names:
+            if rule["label_name"].lower() in exempt_lower:
                 continue
             ids = gmail_client.fetch_emails_older_than(creds, rule["days"], rule["label_name"])
             new_ids = [i for i in ids if i not in trashed_ids]
@@ -26,7 +27,7 @@ def cleanup_retention(account: dict, creds) -> None:
                 )
 
         if retention["global_days"]:
-            excluded = [rule["label_name"] for rule in retention["labels"]] + list(exempt_names)
+            excluded = list({rule["label_name"] for rule in retention["labels"]} | exempt_names)
             ids = gmail_client.fetch_emails_older_than(
                 creds, retention["global_days"], excluded_labels=excluded
             )

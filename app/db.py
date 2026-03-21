@@ -184,6 +184,14 @@ def list_accounts():
         ).fetchall()]
 
 
+def list_accounts_safe():
+    """List accounts without credentials_json — for UI display only."""
+    with get_db_readonly() as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT id, email, added_at, last_scan_at, active FROM accounts ORDER BY added_at DESC"
+        ).fetchall()]
+
+
 def get_account(account_id):
     with get_db_readonly() as conn:
         row = conn.execute("SELECT * FROM accounts WHERE id = ?", (account_id,)).fetchone()
@@ -222,13 +230,10 @@ def delete_account(account_id):
 
 
 def toggle_account(account_id):
-    account = get_account(account_id)
-    if not account:
-        return None
-    new_state = 0 if account["active"] else 1
     with get_db() as conn:
-        conn.execute("UPDATE accounts SET active=? WHERE id=?", (new_state, account_id))
-    return new_state
+        conn.execute("UPDATE accounts SET active = 1 - active WHERE id = ?", (account_id,))
+        row = conn.execute("SELECT active FROM accounts WHERE id = ?", (account_id,)).fetchone()
+    return row["active"] if row else None
 
 
 # ---- Prompts ----
@@ -251,6 +256,12 @@ def list_prompts(account_id=None):
                 "SELECT * FROM prompts ORDER BY sort_order ASC, id ASC"
             ).fetchall()
     return [dict(r) for r in rows]
+
+
+def get_prompt(prompt_id):
+    with get_db_readonly() as conn:
+        row = conn.execute("SELECT * FROM prompts WHERE id = ?", (prompt_id,)).fetchone()
+    return dict(row) if row else None
 
 
 def create_prompt(name, instructions, label_name, action_archive=0, action_spam=0,

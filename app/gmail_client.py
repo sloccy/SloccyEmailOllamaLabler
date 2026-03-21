@@ -77,19 +77,6 @@ def _gmail_request(method, path, creds, **kwargs):
     return resp.json() if resp.content else None
 
 
-def get_or_create_label(creds, label_name: str) -> str:
-    result = _gmail_request("GET", "labels", creds)
-    for label in result.get("labels", []):
-        if label["name"].lower() == label_name.lower():
-            return label["id"]
-    created = _gmail_request("POST", "labels", creds, json={
-        "name": label_name,
-        "labelListVisibility": "labelShow",
-        "messageListVisibility": "show",
-    })
-    return created["id"]
-
-
 def build_label_cache(creds, label_names: list) -> dict:
     """Fetch the Gmail label list once, create any missing labels, return {name: id}."""
     result = _gmail_request("GET", "labels", creds)
@@ -108,20 +95,27 @@ def build_label_cache(creds, label_names: list) -> dict:
     return cache
 
 
-def fetch_recent_emails(creds, max_results=GMAIL_MAX_RESULTS, lookback_hours=GMAIL_LOOKBACK_HOURS):
+def list_recent_message_ids(creds, max_results=GMAIL_MAX_RESULTS, lookback_hours=GMAIL_LOOKBACK_HOURS) -> list:
+    """Return message IDs of recent inbox emails (lightweight, no full content)."""
     after_ts = int(time.time() - lookback_hours * 3600)
     response = _gmail_request("GET", "messages", creds, params={
         "maxResults": max_results,
         "q": f"in:inbox after:{after_ts}",
     })
-    messages = response.get("messages", [])
+    return [m["id"] for m in response.get("messages", [])]
 
-    def fetch_one(msg):
-        full = _gmail_request("GET", f"messages/{msg['id']}", creds, params={"format": "full"})
+
+def fetch_message_details(creds, message_ids: list) -> list:
+    """Fetch full content for the given message IDs in parallel."""
+    if not message_ids:
+        return []
+
+    def fetch_one(msg_id):
+        full = _gmail_request("GET", f"messages/{msg_id}", creds, params={"format": "full"})
         headers = {h["name"]: h["value"] for h in full["payload"]["headers"]}
         body = _extract_body(full["payload"])
         return {
-            "id": msg["id"],
+            "id": msg_id,
             "subject": headers.get("Subject", "(no subject)"),
             "sender": headers.get("From", "unknown"),
             "snippet": full.get("snippet", ""),
@@ -129,22 +123,18 @@ def fetch_recent_emails(creds, max_results=GMAIL_MAX_RESULTS, lookback_hours=GMA
         }
 
     with ThreadPoolExecutor(max_workers=10) as executor:
-        return list(executor.map(fetch_one, messages))
+        return list(executor.map(fetch_one, message_ids))
 
 
-def apply_label(creds, message_id: str, label_id: str):
-    _gmail_request("POST", f"messages/{message_id}/modify", creds,
-                   json={"addLabelIds": [label_id]})
-
-
-def archive_email(creds, message_id: str):
-    _gmail_request("POST", f"messages/{message_id}/modify", creds,
-                   json={"removeLabelIds": ["INBOX"]})
-
-
-def spam_email(creds, message_id: str):
-    _gmail_request("POST", f"messages/{message_id}/modify", creds,
-                   json={"addLabelIds": ["SPAM"], "removeLabelIds": ["INBOX"]})
+def modify_email(creds, message_id: str, add_label_ids: list = None, remove_label_ids: list = None):
+    """Single modify call combining label additions and removals."""
+    body = {}
+    if add_label_ids:
+        body["addLabelIds"] = add_label_ids
+    if remove_label_ids:
+        body["removeLabelIds"] = remove_label_ids
+    if body:
+        _gmail_request("POST", f"messages/{message_id}/modify", creds, json=body)
 
 
 def trash_email(creds, message_id: str):
@@ -196,11 +186,6 @@ def batch_trash_emails(creds, message_ids: list) -> int:
         })
         total += len(chunk)
     return total
-
-
-def mark_email_read(creds, message_id: str):
-    _gmail_request("POST", f"messages/{message_id}/modify", creds,
-                   json={"removeLabelIds": ["UNREAD"]})
 
 
 def _extract_body(payload) -> str:
