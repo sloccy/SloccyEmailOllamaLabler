@@ -36,10 +36,6 @@ def get_db_readonly():
 
 def init_db():
     with get_db() as conn:
-        try:
-            conn.execute("ALTER TABLE processed_emails ADD COLUMN processed_at TEXT DEFAULT (datetime('now'))")
-        except Exception:
-            pass  # Column already exists or table doesn't exist yet (will be created below)
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS accounts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
