@@ -73,9 +73,10 @@ def _process_email(email: dict, account_id: int, email_addr: str,
                     remove_labels.append("UNREAD")
                     actions_taken.append("marked as read")
 
-                gmail_client.modify_email(creds, email["id"], add_labels, remove_labels)
                 if use_trash:
                     gmail_client.trash_email(creds, email["id"])
+                else:
+                    gmail_client.modify_email(creds, email["id"], add_labels, remove_labels)
 
                 if prompt.get("stop_processing"):
                     actions_taken.append("stopped further rules")

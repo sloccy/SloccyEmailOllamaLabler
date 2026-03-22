@@ -8,15 +8,8 @@
     <td class="col-rule" title="{{ r.prompt_name|e }}">{{ r.prompt_name|e }}</td>
     <td class="col-label"><span class="tag is-primary border u-border-primary-subtle font-mono">{{ r.label_name|e }}</span></td>
     <td class="col-actions">
-      {% set extra_actions = [] %}
-      {% for act in (r.actions or '').split(',') %}
-        {% set a = act.strip() %}
-        {% if a and not a.startswith('labeled →') %}
-          {% set _ = extra_actions.append(a) %}
-        {% endif %}
-      {% endfor %}
-      {% if extra_actions %}
-        {% for a in extra_actions %}<span class="tag is-info">{{ a|e }}</span>{% endfor %}
+      {% if r.extra_actions %}
+        {% for a in r.extra_actions %}<span class="tag is-info">{{ a|e }}</span>{% endfor %}
       {% else %}
         <span class="u-text-muted">—</span>
       {% endif %}

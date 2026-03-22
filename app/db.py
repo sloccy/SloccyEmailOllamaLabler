@@ -119,6 +119,7 @@ def init_db():
             -- Create indexes for better performance
             CREATE INDEX IF NOT EXISTS idx_processed_emails_account_id ON processed_emails(account_id);
             CREATE INDEX IF NOT EXISTS idx_processed_emails_message_id ON processed_emails(message_id);
+            CREATE INDEX IF NOT EXISTS idx_processed_emails_processed_at ON processed_emails(processed_at);
             CREATE INDEX IF NOT EXISTS idx_accounts_active ON accounts(active);
             CREATE INDEX IF NOT EXISTS idx_prompts_active ON prompts(active);
             CREATE INDEX IF NOT EXISTS idx_prompts_account_id ON prompts(account_id);
@@ -147,6 +148,7 @@ def _migrate():
         "ALTER TABLE prompts ADD COLUMN stop_processing INTEGER DEFAULT 0",
         "ALTER TABLE prompts ADD COLUMN account_id INTEGER DEFAULT NULL",
         "ALTER TABLE processed_emails ADD COLUMN processed_at TEXT DEFAULT (datetime('now'))",
+        "CREATE INDEX IF NOT EXISTS idx_processed_emails_processed_at ON processed_emails(processed_at)",
         "CREATE TABLE IF NOT EXISTS account_retention (account_id INTEGER PRIMARY KEY, global_days INTEGER)",
         "CREATE TABLE IF NOT EXISTS label_retention (id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL, label_name TEXT NOT NULL, days INTEGER NOT NULL, UNIQUE(account_id, label_name))",
         "CREATE TABLE IF NOT EXISTS label_exemptions (id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL, label_name TEXT NOT NULL, UNIQUE(account_id, label_name))",
@@ -294,6 +296,14 @@ def update_prompt(prompt_id, name, instructions, label_name, active,
              action_trash, action_mark_read, stop_processing,
              account_id if account_id else None, prompt_id),
         )
+
+
+def toggle_prompt(prompt_id) -> int | None:
+    """Flip the active flag. Returns the new active value."""
+    with get_db() as conn:
+        conn.execute("UPDATE prompts SET active = 1 - active WHERE id = ?", (prompt_id,))
+        row = conn.execute("SELECT active FROM prompts WHERE id = ?", (prompt_id,)).fetchone()
+    return row["active"] if row else None
 
 
 def reorder_prompts(ordered_ids: list):

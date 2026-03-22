@@ -415,19 +415,9 @@ def frag_delete_prompt(prompt_id):
 
 @app.route("/fragments/prompts/<int:prompt_id>/toggle", methods=["POST"])
 def frag_toggle_prompt(prompt_id):
-    p = db.get_prompt(prompt_id)
-    if not p:
+    new_active = db.toggle_prompt(prompt_id)
+    if new_active is None:
         return "", 404
-    new_active = 0 if p["active"] else 1
-    db.update_prompt(
-        prompt_id, p["name"], p["instructions"], p["label_name"], new_active,
-        action_archive=p.get("action_archive", 0),
-        action_spam=p.get("action_spam", 0),
-        action_trash=p.get("action_trash", 0),
-        action_mark_read=p.get("action_mark_read", 0),
-        stop_processing=p.get("stop_processing", 0),
-        account_id=p.get("account_id"),
-    )
     p = db.get_prompt(prompt_id)
     accounts = _safe_accounts()
     account_map = {a["id"]: a["email"] for a in accounts}
@@ -509,6 +499,11 @@ def frag_history():
         sender=sender or None,
         limit=limit,
     )
+    for r in rows:
+        r["extra_actions"] = [
+            a.strip() for a in (r.get("actions") or "").split(",")
+            if a.strip() and not a.strip().startswith("labeled →")
+        ]
     return fragment_response("fragments/history_table.html", {"rows": rows})
 
 
