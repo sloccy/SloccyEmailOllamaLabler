@@ -21,7 +21,7 @@ CREDENTIALS_FILE = os.getenv("CREDENTIALS_FILE", "/credentials/credentials.json"
 REDIRECT_URI = "http://localhost"
 GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me"
 
-_label_cache: dict = {}  # refresh_token -> (timestamp, labels)
+_label_cache: dict = {}  # token -> (timestamp, labels)
 _LABEL_CACHE_TTL = 300  # 5 minutes
 
 _retry = Retry(
@@ -81,7 +81,7 @@ def _gmail_request(method, path, creds, **kwargs):
 
 
 def _invalidate_label_cache(creds):
-    _label_cache.pop(creds.refresh_token, None)
+    _label_cache.pop(creds.token, None)
 
 
 def build_label_cache(creds, label_names: list) -> dict:
@@ -150,7 +150,7 @@ def trash_email(creds, message_id: str):
 
 
 def list_labels(creds) -> list:
-    cache_key = creds.refresh_token
+    cache_key = creds.token
     cached = _label_cache.get(cache_key)
     if cached:
         ts, labels = cached
