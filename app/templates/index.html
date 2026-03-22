@@ -347,7 +347,10 @@
       <div class="u-flex u-items-center u-gap-3 u-mb-4">
         <label class="form-label u-mb-0">Account</label>
         <div class="select is-small u-w-auto">
-          <select id="retention-account-select" name="account_id">
+          <select id="retention-account-select" name="account_id"
+            hx-get="/fragments/account-options?type=retention"
+            hx-trigger="intersect once"
+            hx-swap="innerHTML">
           </select>
         </div>
       </div>
@@ -372,8 +375,7 @@
     const newPrompt = document.getElementById('new-prompt-account');
     if (newPrompt) newPrompt.innerHTML = '<option value="">All accounts (global)</option>' + accountOptions;
 
-    const retention = document.getElementById('retention-account-select');
-    if (retention) retention.innerHTML = '<option value="">\u2026Select an account\u2026</option>' + accountOptions;
+
   }
 
   // ---- Toast ----
