@@ -501,8 +501,8 @@ def frag_history():
     )
     for r in rows:
         r["extra_actions"] = [
-            a.strip() for a in (r.get("actions") or "").split(",")
-            if a.strip() and not a.strip().startswith("labeled →")
+            s for a in (r.get("actions") or "").split(",")
+            if (s := a.strip()) and not s.startswith("labeled →")
         ]
     return fragment_response("fragments/history_table.html", {"rows": rows})
 

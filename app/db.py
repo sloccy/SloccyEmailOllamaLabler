@@ -233,11 +233,15 @@ def delete_account(account_id):
         conn.execute("DELETE FROM processed_emails WHERE account_id = ?", (account_id,))
 
 
-def toggle_account(account_id):
+def _toggle_active(table: str, row_id: int) -> int | None:
     with get_db() as conn:
-        conn.execute("UPDATE accounts SET active = 1 - active WHERE id = ?", (account_id,))
-        row = conn.execute("SELECT active FROM accounts WHERE id = ?", (account_id,)).fetchone()
+        conn.execute(f"UPDATE {table} SET active = 1 - active WHERE id = ?", (row_id,))
+        row = conn.execute(f"SELECT active FROM {table} WHERE id = ?", (row_id,)).fetchone()
     return row["active"] if row else None
+
+
+def toggle_account(account_id):
+    return _toggle_active("accounts", account_id)
 
 
 # ---- Prompts ----
@@ -299,11 +303,7 @@ def update_prompt(prompt_id, name, instructions, label_name, active,
 
 
 def toggle_prompt(prompt_id) -> int | None:
-    """Flip the active flag. Returns the new active value."""
-    with get_db() as conn:
-        conn.execute("UPDATE prompts SET active = 1 - active WHERE id = ?", (prompt_id,))
-        row = conn.execute("SELECT active FROM prompts WHERE id = ?", (prompt_id,)).fetchone()
-    return row["active"] if row else None
+    return _toggle_active("prompts", prompt_id)
 
 
 def reorder_prompts(ordered_ids: list):
