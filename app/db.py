@@ -36,10 +36,6 @@ def get_db_readonly():
 
 def init_db():
     with get_db() as conn:
-        try:
-            conn.execute("ALTER TABLE processed_emails ADD COLUMN processed_at TEXT DEFAULT (datetime('now'))")
-        except Exception:
-            pass  # Column already exists or table doesn't exist yet (will be created below)
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS accounts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -123,7 +119,7 @@ def init_db():
             -- Create indexes for better performance
             CREATE INDEX IF NOT EXISTS idx_processed_emails_account_id ON processed_emails(account_id);
             CREATE INDEX IF NOT EXISTS idx_processed_emails_message_id ON processed_emails(message_id);
-            CREATE INDEX IF NOT EXISTS idx_processed_emails_processed_at ON processed_emails(processed_at);
+            -- idx_processed_emails_processed_at created after schema migration below
             CREATE INDEX IF NOT EXISTS idx_accounts_active ON accounts(active);
             CREATE INDEX IF NOT EXISTS idx_prompts_active ON prompts(active);
             CREATE INDEX IF NOT EXISTS idx_prompts_account_id ON prompts(account_id);
@@ -133,6 +129,12 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_cat_history_timestamp ON categorization_history(timestamp);
 
         """)
+        # Migration: add processed_at to existing databases that predate this column
+        try:
+            conn.execute("ALTER TABLE processed_emails ADD COLUMN processed_at TEXT DEFAULT (datetime('now'))")
+        except Exception:
+            pass  # Column already exists
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_processed_emails_processed_at ON processed_emails(processed_at)")
     with get_db() as conn:
         conn.execute(
             "INSERT OR IGNORE INTO settings (key, value) VALUES ('poll_interval', ?)",
