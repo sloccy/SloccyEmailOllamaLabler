@@ -4,29 +4,32 @@
   <p><strong>Local LLM email labeling for Gmail — fully self-hosted, no data leaves your machine.</strong></p>
   <img src="https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white" alt="Docker" />
   <img src="https://img.shields.io/badge/Ollama-powered-black?logo=llama&logoColor=white" alt="Ollama" />
-  <img src="https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white" alt="Python" />
+  <img src="https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white" alt="Python" />
 </div>
 
 ---
 
-OllaMail connects to your Gmail accounts via OAuth, fetches recent emails on a schedule, and runs each email through rules you define in plain English. A local LLM (via [Ollama](https://ollama.com)) decides whether each rule applies and applies the matching Gmail label automatically. Labels are created in Gmail if they don't exist yet.
+OllaMail connects to your Gmail accounts via OAuth, fetches recent emails on a schedule, and runs each email through rules you define in plain English. A local LLM (via [Ollama](https://ollama.com)) decides whether each rule applies and performs the matching action automatically — applying Gmail labels, archiving, trashing, and more. No email content ever leaves your machine.
 
 ## Features
 
-- **Plain-English rules** — write prompts like "newsletters from SaaS products" and map them to a label
+- **Plain-English rules** — write prompts like "newsletters from SaaS products" and map them to a label or action
+- **Multiple Gmail actions** — apply labels, archive, trash, mark as spam, or mark as read
+- **Stop-processing rules** — halt evaluation of subsequent rules for an email once a rule matches
+- **Drag-and-drop rule ordering** — control the order in which rules are evaluated
+- **Per-account or global rules** — scope a rule to a specific account or apply it across all accounts
+- **AI prompt builder** — describe what you want to catch in plain English; the LLM writes the classifier instruction for you (streaming output)
+- **Batch classification** — all rules for an email are evaluated in a single LLM call for efficiency
 - **Multiple accounts** — add as many Gmail accounts as you like via OAuth
 - **Fully local** — all LLM inference runs on-device via Ollama; no email content is sent to any API
-- **Web UI** — manage accounts, prompts, settings, and view processing logs from a browser
+- **Web UI** — manage accounts, rules, retention, settings, and logs from a browser
 - **Auto-label creation** — labels are created in Gmail automatically if they don't exist
+- **Email retention management** — set per-label or global retention rules that auto-trash old emails; add label exemptions to protect important labels
+- **Categorization history** — searchable and filterable log of every labeling decision; CSV export
+- **Config import/export** — full backup and restore of accounts, rules, settings, and retention as JSON
 - **Deduplication** — each email is evaluated once per account and never reprocessed
 - **Configurable polling** — set the interval in the UI; adjust lookback window and batch size via env vars
 - **Raspberry Pi friendly** — works on Pi 4 (4 GB+); Docker handles auto-start on boot
-
----
-
-## Screenshots
-
-> _Add screenshots of the Accounts, Prompts, and Logs pages here._
 
 ---
 
@@ -86,6 +89,14 @@ services:
     restart: unless-stopped
     networks:
       - internal
+    # Uncomment to enable NVIDIA GPU support:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
 
   app:
     image: ghcr.io/sloccy/ollamail:latest
@@ -143,10 +154,13 @@ Navigate to **http://localhost:5001** (or your configured `BASE_URL`).
 
 | Page | Description |
 |---|---|
+| **Dashboard** | Poller status, processing stats, and recent activity |
 | **Accounts** | Add Gmail accounts via OAuth |
 | **Prompts** | Define labeling rules in plain English |
+| **History** | Searchable log of every labeling decision; CSV export |
 | **Settings** | Set poll interval and other runtime options |
 | **Logs** | View per-account processing history |
+| **Retention** | Configure per-label and global email retention rules |
 
 ---
 
@@ -156,8 +170,8 @@ To run without Docker:
 
 ```bash
 # Clone the repo
-git clone https://github.com/sloccy/SloccyEmailOllamaLabeler.git
-cd SloccyEmailOllamaLabeler
+git clone https://github.com/sloccy/OllaMail.git
+cd OllaMail
 
 # Install dependencies
 pip install -r requirements.txt
@@ -170,7 +184,7 @@ export BASE_URL=http://localhost:5000
 export FLASK_SECRET_KEY=dev-secret
 
 # Run the app
-python -m app.main
+python -c "from app.server import create_app; create_app().run(host='0.0.0.0', port=5000, debug=True)"
 ```
 
 You'll also need [Ollama](https://ollama.com) running locally and the model pulled:
@@ -192,7 +206,7 @@ All settings are controlled via environment variables.
 | `OLLAMA_TIMEOUT` | `600` | Seconds to wait for Ollama to respond or pull a model |
 | `OLLAMA_NUM_CTX` | `4096` | LLM context window size in tokens |
 | `OLLAMA_NUM_PREDICT` | `200` | Max tokens for classification responses (small JSON, 200 is plenty) |
-| `OLLAMA_GENERATE_NUM_PREDICT` | `4096` | Max tokens for longer generation tasks |
+| `OLLAMA_GENERATE_NUM_PREDICT` | `4096` | Max tokens for longer generation tasks (e.g. AI prompt builder) |
 | `GMAIL_MAX_RESULTS` | `50` | Emails fetched per inbox scan (only unprocessed ones are classified) |
 | `GMAIL_LOOKBACK_HOURS` | `24` | How far back to look for emails on each scan |
 | `EMAIL_BODY_TRUNCATION` | `3000` | Max characters of email body sent to the LLM |
@@ -200,6 +214,7 @@ All settings are controlled via environment variables.
 | `POLL_INTERVAL` | `300` | Default poll interval in seconds (also configurable in the UI) |
 | `MIN_POLL_INTERVAL` | `30` | Minimum allowed poll interval in seconds |
 | `HISTORY_MAX_LIMIT` | `500` | Maximum rows returned in history/log queries |
+| `DEBUG_LOGGING` | `0` | Set to `1` to enable verbose debug logging |
 
 ---
 
@@ -210,14 +225,15 @@ All settings are controlled via environment variables.
 │   Gmail API │ ◄────────────► │  OllaMail   │
 └─────────────┘                │    (Flask)  │
                                └──────┬──────┘
-                                      │ email body + prompt
+                                      │ email body + all rules
                                ┌──────▼──────┐
                                │   Ollama    │
                                │  (local LLM)│
                                └──────┬──────┘
-                                      │ YES / NO
+                                      │ per-rule YES/NO (single call)
                                ┌──────▼──────┐
                                │ Apply label │
+                               │ / action    │
                                │ via Gmail   │
                                │ API         │
                                └─────────────┘
@@ -225,9 +241,9 @@ All settings are controlled via environment variables.
 
 1. The poller wakes up every N seconds (configurable in the UI).
 2. For each active Gmail account, it fetches recent emails (limited by `GMAIL_MAX_RESULTS` and `GMAIL_LOOKBACK_HOURS`).
-3. Each email body is truncated to `EMAIL_BODY_TRUNCATION` characters and passed through each active prompt rule.
-4. The local LLM returns a structured YES/NO decision per rule.
-5. If YES, the label is applied to the email via the Gmail API. If the label doesn't exist in Gmail, it is created automatically.
+3. Each email body is truncated to `EMAIL_BODY_TRUNCATION` characters and all active rules are sent to the LLM **in a single call**, which returns a structured per-rule true/false decision.
+4. For each matched rule, the configured action is applied via the Gmail API (label, archive, trash, spam, mark as read). Labels are created in Gmail automatically if they don't exist.
+5. If a matched rule has **stop processing** enabled, no further rules are evaluated for that email.
 6. Processed email IDs are stored in SQLite so each email is evaluated only once per account.
 
 ---
@@ -246,9 +262,10 @@ All settings are controlled via environment variables.
 
 | Component | Technology |
 |---|---|
-| Backend | Python / Flask |
-| UI | Bootstrap 5.3 (dark mode) + HTMX |
-| Database | SQLite (via SQLAlchemy) |
+| Backend | Python 3.14 / Flask 3 |
+| WSGI server | Waitress |
+| UI | Bulma 1.0 (dark mode) + HTMX 2.0 |
+| Database | SQLite (raw SQL, no ORM) |
 | LLM runtime | Ollama |
 | Gmail integration | Google OAuth 2.0 + Gmail API |
 | Deployment | Docker / Docker Compose |
