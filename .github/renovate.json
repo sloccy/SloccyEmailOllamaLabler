@@ -15,6 +15,7 @@
       "datasourceTemplate": "npm"
     }
   ],
+  "stabilityDays": 7,
   "packageRules": [
     {
       "matchManagers": ["dockerfile", "github-actions", "pip_requirements", "regex"],
