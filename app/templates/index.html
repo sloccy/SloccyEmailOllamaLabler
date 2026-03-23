@@ -4,10 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OllaMail</title>
-  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
-<link href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css" rel="stylesheet" type="text/css">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://unpkg.com" crossorigin>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}?v={{ asset_v }}">
+  <link href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css" rel="stylesheet" type="text/css">
   <!-- No Tailwind runtime — all utilities are in static/style.css. Bulma component classes come from bulma.min.css. -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ asset_v }}">
   <script src="https://unpkg.com/htmx.org@2.0.8" defer></script>
   <script src="https://unpkg.com/htmx-ext-sse@2.2.4/sse.js" defer></script>
 </head>
@@ -15,7 +17,7 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="sidebar-logo border-b u-mb-3 u-pb-3">
-      <img src="{{ url_for('static', filename='logo.png') }}" alt="OllaMail">
+      <img src="{{ url_for('static', filename='logo.webp') }}?v={{ asset_v }}" alt="OllaMail">
     </div>
     <nav class="u-flex-grow">
       <ul class="nav-menu nav-menu-sm gap-0.5">

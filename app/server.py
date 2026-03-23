@@ -1,8 +1,11 @@
 import csv
 import gzip
+import hashlib
 import html as _html
 import io
 import json
+import os
+import re
 import secrets
 import threading
 import time as _time
@@ -17,7 +20,65 @@ from app.config import (POLL_INTERVAL, OLLAMA_MODEL, OLLAMA_HOST, OLLAMA_TIMEOUT
 app = Flask(__name__, template_folder="templates")
 app.secret_key = "placeholder-replaced-at-startup"
 
-_gzip_cache = {}
+_ASSET_VERSION = str(int(_time.time()))
+_STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+_static_cache: dict[str, tuple[bytes, bytes | None, str, str]] = {}
+
+_CONTENT_TYPES = {
+    ".css": "text/css; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".ico": "image/x-icon",
+    ".svg": "image/svg+xml",
+}
+
+
+def _minify_css(text: str) -> str:
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"\s*([{}:;,>~+])\s*", r"\1", text)
+    text = re.sub(r";}", "}", text)
+    return text.strip()
+
+
+def _load_static(filename: str) -> tuple[bytes, bytes | None, str, str]:
+    filepath = os.path.join(_STATIC_DIR, filename)
+    with open(filepath, "rb") as f:
+        raw = f.read()
+    ext = os.path.splitext(filename)[1].lower()
+    if ext == ".css" and not filename.endswith(".min.css"):
+        raw = _minify_css(raw.decode("utf-8")).encode("utf-8")
+    gz = gzip.compress(raw) if len(raw) >= 500 else None
+    etag = hashlib.md5(raw).hexdigest()[:12]
+    ct = _CONTENT_TYPES.get(ext, "application/octet-stream")
+    return raw, gz, etag, ct
+
+
+@app.context_processor
+def _inject_asset_version():
+    return {"asset_v": _ASSET_VERSION}
+
+
+@app.route("/static/<path:filename>")
+def serve_static(filename):
+    if filename not in _static_cache:
+        try:
+            _static_cache[filename] = _load_static(filename)
+        except (FileNotFoundError, IsADirectoryError):
+            from flask import abort
+            abort(404)
+    raw, gz, etag, ct = _static_cache[filename]
+    versioned = "v=" in request.query_string.decode()
+    cc = "public, max-age=31536000, immutable" if versioned else "public, max-age=86400"
+    if request.headers.get("If-None-Match") == etag:
+        return Response(status=304, headers={"ETag": etag, "Cache-Control": cc})
+    use_gz = gz is not None and "gzip" in request.headers.get("Accept-Encoding", "")
+    headers = {"Content-Type": ct, "Cache-Control": cc, "ETag": etag, "Vary": "Accept-Encoding"}
+    if use_gz:
+        headers["Content-Encoding"] = "gzip"
+        return Response(gz, headers=headers)
+    return Response(raw, headers=headers)
 
 
 # ---- Fragment helpers ----
@@ -68,12 +129,7 @@ def compress_response(response):
     data = response.get_data()
     if len(data) < 500:
         return response
-    if request.path.startswith("/static/"):
-        if request.path not in _gzip_cache:
-            _gzip_cache[request.path] = gzip.compress(data)
-        compressed = _gzip_cache[request.path]
-    else:
-        compressed = gzip.compress(data)
+    compressed = gzip.compress(data)
     response.set_data(compressed)
     response.headers["Content-Encoding"] = "gzip"
     response.headers["Content-Length"] = len(compressed)
