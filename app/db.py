@@ -1,7 +1,8 @@
-import sqlite3
 import os
+import sqlite3
 import time
 from contextlib import contextmanager
+
 from app.config import LOG_RETENTION_DAYS, POLL_INTERVAL
 
 DB_PATH = os.path.join(os.getenv("DATA_DIR", "/data"), "labeler.db")
@@ -36,6 +37,7 @@ def get_db_readonly():
 
 # ---- Generic query helpers ----
 
+
 def _fetch_one(sql, params=()):
     with get_db_readonly() as conn:
         row = conn.execute(sql, params).fetchone()
@@ -53,6 +55,7 @@ def _execute(sql, params=()):
 
 
 # ---- Schema & Migrations ----
+
 
 def init_db():
     with get_db() as conn:
@@ -178,6 +181,7 @@ def _migrate():
 
 # ---- Settings ----
 
+
 def get_setting(key, default=None):
     row = _fetch_one("SELECT value FROM settings WHERE key = ?", (key,))
     return row["value"] if row else default
@@ -188,6 +192,7 @@ def set_setting(key, value):
 
 
 # ---- Accounts ----
+
 
 def list_accounts():
     return _fetch_all("SELECT * FROM accounts ORDER BY added_at DESC")
@@ -237,6 +242,7 @@ def toggle_account(account_id):
 
 # ---- Prompts ----
 
+
 def list_prompts(account_id=None):
     """Return prompts. If account_id given, return prompts for that account plus global ones."""
     if account_id is not None:
@@ -251,8 +257,17 @@ def get_prompt(prompt_id):
     return _fetch_one("SELECT * FROM prompts WHERE id = ?", (prompt_id,))
 
 
-def create_prompt(name, instructions, label_name, action_archive=0, action_spam=0,
-                  action_trash=0, action_mark_read=0, stop_processing=0, account_id=None):
+def create_prompt(
+    name,
+    instructions,
+    label_name,
+    action_archive=0,
+    action_spam=0,
+    action_trash=0,
+    action_mark_read=0,
+    stop_processing=0,
+    account_id=None,
+):
     with get_db() as conn:
         row = conn.execute("SELECT MAX(sort_order) as m FROM prompts").fetchone()
         next_order = (row["m"] or 0) + 1
@@ -260,22 +275,51 @@ def create_prompt(name, instructions, label_name, action_archive=0, action_spam=
             "INSERT INTO prompts (name, instructions, label_name, action_archive, action_spam,"
             " action_trash, action_mark_read, sort_order, stop_processing, account_id)"
             " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (name, instructions, label_name, action_archive, action_spam,
-             action_trash, action_mark_read, next_order, stop_processing,
-             account_id if account_id else None),
+            (
+                name,
+                instructions,
+                label_name,
+                action_archive,
+                action_spam,
+                action_trash,
+                action_mark_read,
+                next_order,
+                stop_processing,
+                account_id if account_id else None,
+            ),
         )
 
 
-def update_prompt(prompt_id, name, instructions, label_name, active,
-                  action_archive=0, action_spam=0, action_trash=0, action_mark_read=0,
-                  stop_processing=0, account_id=None):
+def update_prompt(
+    prompt_id,
+    name,
+    instructions,
+    label_name,
+    active,
+    action_archive=0,
+    action_spam=0,
+    action_trash=0,
+    action_mark_read=0,
+    stop_processing=0,
+    account_id=None,
+):
     _execute(
         "UPDATE prompts SET name=?, instructions=?, label_name=?, active=?,"
         " action_archive=?, action_spam=?, action_trash=?, action_mark_read=?,"
         " stop_processing=?, account_id=? WHERE id=?",
-        (name, instructions, label_name, active, action_archive, action_spam,
-         action_trash, action_mark_read, stop_processing,
-         account_id if account_id else None, prompt_id),
+        (
+            name,
+            instructions,
+            label_name,
+            active,
+            action_archive,
+            action_spam,
+            action_trash,
+            action_mark_read,
+            stop_processing,
+            account_id if account_id else None,
+            prompt_id,
+        ),
     )
 
 
@@ -296,6 +340,7 @@ def delete_prompt(prompt_id):
 
 
 # ---- Processed emails ----
+
 
 def filter_unprocessed(account_id, message_ids: list) -> list:
     """Return the subset of message_ids that have NOT been processed yet."""
@@ -324,6 +369,7 @@ def trim_processed_emails(lookback_hours):
 
 # ---- Logs ----
 
+
 def add_log(level, message):
     _execute("INSERT INTO logs (level, message) VALUES (?, ?)", (level.upper(), message))
 
@@ -345,15 +391,16 @@ def get_logs_range(start, end):
 
 # ---- Categorization History ----
 
-def add_categorization(account_id, account_email, message_id, subject, sender,
-                       prompt_id, prompt_name, label_name, actions):
+
+def add_categorization(
+    account_id, account_email, message_id, subject, sender, prompt_id, prompt_name, label_name, actions
+):
     _execute(
         "INSERT INTO categorization_history"
         " (account_id, account_email, message_id, subject, sender,"
         "  prompt_id, prompt_name, label_name, actions)"
         " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (account_id, account_email, message_id, subject, sender,
-         prompt_id, prompt_name, label_name, actions),
+        (account_id, account_email, message_id, subject, sender, prompt_id, prompt_name, label_name, actions),
     )
 
 
@@ -381,11 +428,16 @@ def get_categorization_history(account_id=None, prompt_id=None, subject=None, se
 
 # ---- Retention Rules ----
 
+
 def get_retention(account_id):
     with get_db_readonly() as conn:
         row = conn.execute("SELECT global_days FROM account_retention WHERE account_id = ?", (account_id,)).fetchone()
-        labels = conn.execute("SELECT id, label_name, days FROM label_retention WHERE account_id = ? ORDER BY id ASC", (account_id,)).fetchall()
-        exemptions = conn.execute("SELECT id, label_name FROM label_exemptions WHERE account_id = ? ORDER BY label_name ASC", (account_id,)).fetchall()
+        labels = conn.execute(
+            "SELECT id, label_name, days FROM label_retention WHERE account_id = ? ORDER BY id ASC", (account_id,)
+        ).fetchall()
+        exemptions = conn.execute(
+            "SELECT id, label_name FROM label_exemptions WHERE account_id = ? ORDER BY label_name ASC", (account_id,)
+        ).fetchall()
     return {
         "global_days": row["global_days"] if row else None,
         "labels": [dict(r) for r in labels],
@@ -402,7 +454,10 @@ def clear_global_retention(account_id):
 
 
 def add_label_retention(account_id, label_name, days):
-    _execute("INSERT OR REPLACE INTO label_retention (account_id, label_name, days) VALUES (?, ?, ?)", (account_id, label_name, days))
+    _execute(
+        "INSERT OR REPLACE INTO label_retention (account_id, label_name, days) VALUES (?, ?, ?)",
+        (account_id, label_name, days),
+    )
 
 
 def delete_label_retention(rule_id):
@@ -419,6 +474,7 @@ def delete_label_exemption(exemption_id):
 
 # ---- Import helpers ----
 
+
 def create_account_placeholder(email):
     """Insert account with email only (no credentials). Returns account id."""
     with get_db() as conn:
@@ -432,7 +488,10 @@ def prompt_exists(name, account_id):
 
 
 def label_retention_exists(account_id, label_name):
-    return _fetch_one("SELECT 1 FROM label_retention WHERE account_id = ? AND label_name = ?", (account_id, label_name)) is not None
+    return (
+        _fetch_one("SELECT 1 FROM label_retention WHERE account_id = ? AND label_name = ?", (account_id, label_name))
+        is not None
+    )
 
 
 def has_global_retention(account_id):

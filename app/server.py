@@ -2,20 +2,20 @@ import csv
 import html as _html
 import io
 import json
-import os
 import secrets
 import threading
 import time as _time
-from datetime import datetime, timezone
-from urllib.parse import urlparse, parse_qs
-from flask import Flask, jsonify, request, render_template, session, Response, make_response
+from datetime import UTC, datetime
+from urllib.parse import parse_qs, urlparse
+
+from flask import Flask, Response, jsonify, make_response, render_template, request, session
 from flask_compress import Compress
+
 from app import db, gmail_client, poller
+from app.config import HISTORY_MAX_LIMIT, MIN_POLL_INTERVAL, OLLAMA_HOST, OLLAMA_MODEL, POLL_INTERVAL
 from app.llm import get_provider as _get_llm_provider
+
 _llm = _get_llm_provider()
-from app.config import (POLL_INTERVAL, OLLAMA_MODEL, OLLAMA_HOST, OLLAMA_TIMEOUT,
-                        OLLAMA_NUM_CTX, OLLAMA_NUM_PREDICT, GMAIL_MAX_RESULTS,
-                        GMAIL_LOOKBACK_HOURS, MIN_POLL_INTERVAL, HISTORY_MAX_LIMIT)
 
 app = Flask(__name__, template_folder="templates")
 app.secret_key = "placeholder-replaced-at-startup"
@@ -30,6 +30,7 @@ def _inject_asset_version():
 
 
 # ---- Fragment helpers ----
+
 
 def _fmt_interval(secs):
     secs = int(secs)
@@ -64,7 +65,6 @@ app.jinja_env.filters["fmtinterval"] = _fmt_interval
 app.jinja_env.filters["fmtretention"] = _fmt_retention
 
 
-
 def fragment_response(template, ctx, toast=None):
     resp = make_response(render_template(template, **ctx))
     if toast:
@@ -79,6 +79,7 @@ def _safe_accounts():
 
 
 # ---- UI ----
+
 
 @app.route("/")
 def index():
@@ -95,16 +96,16 @@ def _ensure_label_for_accounts(account_id, label_name):
             if not account:
                 continue
             try:
-                service, refreshed_creds = gmail_client.get_service(account["credentials_json"])
-                if refreshed_creds and refreshed_creds != account["credentials_json"]:
-                    db.update_account_credentials(account["id"], refreshed_creds)
+                service = gmail_client.get_service_and_refresh(account)
                 gmail_client.build_label_cache(service, [label_name])
             except Exception as e:
                 db.add_log("WARNING", f"Could not pre-create label '{label_name}' for account {account.get('id')}: {e}")
+
     threading.Thread(target=_do, daemon=True).start()
 
 
 # ---- API routes (fetch / download) ----
+
 
 @app.route("/api/prompts/reorder", methods=["POST"])
 def api_reorder_prompts():
@@ -128,8 +129,18 @@ def api_export_prompts():
     else:
         prompts = db.list_prompts()
 
-    export_fields = ["name", "instructions", "label_name", "active", "action_archive",
-                     "action_spam", "action_trash", "action_mark_read", "stop_processing", "account_id"]
+    export_fields = [
+        "name",
+        "instructions",
+        "label_name",
+        "active",
+        "action_archive",
+        "action_spam",
+        "action_trash",
+        "action_mark_read",
+        "stop_processing",
+        "account_id",
+    ]
     export_data = [{k: p[k] for k in export_fields if k in p} for p in prompts]
 
     accounts = {a["id"]: a["email"] for a in db.list_accounts()}
@@ -157,39 +168,41 @@ def api_export_config():
     prompts_export = []
     for p in prompts_raw:
         aid = p.get("account_id")
-        prompts_export.append({
-            "name": p["name"],
-            "instructions": p["instructions"],
-            "label_name": p["label_name"],
-            "active": p["active"],
-            "action_archive": p.get("action_archive", 0),
-            "action_spam": p.get("action_spam", 0),
-            "action_trash": p.get("action_trash", 0),
-            "action_mark_read": p.get("action_mark_read", 0),
-            "stop_processing": p.get("stop_processing", 0),
-            "account": account_map.get(aid, "all accounts") if aid else "all accounts",
-            "sort_order": p.get("sort_order", 0),
-        })
+        prompts_export.append(
+            {
+                "name": p["name"],
+                "instructions": p["instructions"],
+                "label_name": p["label_name"],
+                "active": p["active"],
+                "action_archive": p.get("action_archive", 0),
+                "action_spam": p.get("action_spam", 0),
+                "action_trash": p.get("action_trash", 0),
+                "action_mark_read": p.get("action_mark_read", 0),
+                "stop_processing": p.get("stop_processing", 0),
+                "account": account_map.get(aid, "all accounts") if aid else "all accounts",
+                "sort_order": p.get("sort_order", 0),
+            }
+        )
 
     with db.get_db_readonly() as conn:
         settings_rows = conn.execute("SELECT key, value FROM settings").fetchall()
-    settings_export = {r["key"]: r["value"] for r in settings_rows
-                       if r["key"] != "flask_secret_key"}
+    settings_export = {r["key"]: r["value"] for r in settings_rows if r["key"] != "flask_secret_key"}
 
     retention_export = []
     for a in accounts_raw:
         ret = db.get_retention(a["id"])
-        retention_export.append({
-            "account": a["email"],
-            "global_days": ret["global_days"],
-            "label_rules": [{"label_name": lr["label_name"], "days": lr["days"]}
-                            for lr in ret["labels"]],
-            "exemptions": [{"label_name": ex["label_name"]} for ex in ret["exemptions"]],
-        })
+        retention_export.append(
+            {
+                "account": a["email"],
+                "global_days": ret["global_days"],
+                "label_rules": [{"label_name": lr["label_name"], "days": lr["days"]} for lr in ret["labels"]],
+                "exemptions": [{"label_name": ex["label_name"]} for ex in ret["exemptions"]],
+            }
+        )
 
     payload = {
         "version": 1,
-        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "exported_at": datetime.now(UTC).isoformat(),
         "accounts": accounts_export,
         "prompts": prompts_export,
         "settings": settings_export,
@@ -215,10 +228,12 @@ def api_import_config():
     if "version" not in data:
         return jsonify({"error": "Missing version key — not a valid config backup."}), 400
 
-    summary = {"accounts": {"added": 0, "skipped": 0},
-               "prompts": {"added": 0, "skipped": 0},
-               "settings": {"added": 0, "skipped": 0},
-               "retention": {"added": 0, "skipped": 0}}
+    summary = {
+        "accounts": {"added": 0, "skipped": 0},
+        "prompts": {"added": 0, "skipped": 0},
+        "settings": {"added": 0, "skipped": 0},
+        "retention": {"added": 0, "skipped": 0},
+    }
 
     # Accounts — build email→id mapping
     email_to_id = {a["email"]: a["id"] for a in db.list_accounts()}
@@ -241,7 +256,9 @@ def api_import_config():
             summary["prompts"]["skipped"] += 1
         else:
             db.create_prompt(
-                p["name"], p["instructions"], p["label_name"],
+                p["name"],
+                p["instructions"],
+                p["label_name"],
                 action_archive=p.get("action_archive", 0),
                 action_spam=p.get("action_spam", 0),
                 action_trash=p.get("action_trash", 0),
@@ -293,8 +310,8 @@ def api_download_logs():
     out = io.StringIO()
     w = csv.writer(out)
     w.writerow(["timestamp", "level", "message"])
-    for l in logs:
-        w.writerow([l["timestamp"], l["level"], l["message"]])
+    for row in logs:
+        w.writerow([row["timestamp"], row["level"], row["message"]])
     filename = f"logs_{start[:10]}_{end[:10]}.csv"
     return Response(
         out.getvalue(),
@@ -304,6 +321,7 @@ def api_download_logs():
 
 
 # ---- Fragment routes ----
+
 
 @app.route("/fragments/dashboard")
 def frag_dashboard():
@@ -317,14 +335,17 @@ def frag_dashboard():
         next_scan = _fmt_interval(secs) if secs > 0 else "now"
     else:
         next_scan = "—"
-    return fragment_response("fragments/dashboard.html", {
-        "accounts": accounts,
-        "active_prompts": sum(1 for p in prompts if p["active"]),
-        "poll_interval": _fmt_interval(poll_interval),
-        "next_scan": next_scan,
-        "poller_running": status.get("running", False),
-        "logs": logs,
-    })
+    return fragment_response(
+        "fragments/dashboard.html",
+        {
+            "accounts": accounts,
+            "active_prompts": sum(1 for p in prompts if p["active"]),
+            "poll_interval": _fmt_interval(poll_interval),
+            "next_scan": next_scan,
+            "poller_running": status.get("running", False),
+            "logs": logs,
+        },
+    )
 
 
 @app.route("/fragments/accounts")
@@ -346,8 +367,7 @@ def frag_delete_account(account_id):
     db.delete_account(account_id)
     db.add_log("INFO", f"Account {account_id} removed.")
     accounts = _safe_accounts()
-    return fragment_response("fragments/accounts_list.html", {"accounts": accounts},
-                             toast="Account removed.")
+    return fragment_response("fragments/accounts_list.html", {"accounts": accounts}, toast="Account removed.")
 
 
 @app.route("/fragments/prompts")
@@ -355,8 +375,7 @@ def frag_prompts():
     account_id = request.args.get("account_id", "")
     prompts = db.list_prompts(account_id=int(account_id)) if account_id else db.list_prompts()
     accounts = _safe_accounts()
-    return fragment_response("fragments/prompts_list.html",
-                             {"prompts": prompts, "accounts": accounts})
+    return fragment_response("fragments/prompts_list.html", {"prompts": prompts, "accounts": accounts})
 
 
 @app.route("/fragments/prompts", methods=["POST"])
@@ -366,14 +385,16 @@ def frag_create_prompt():
     instructions = f.get("instructions", "").strip()
     label_name = f.get("label_name", "").strip()
     if not name or not instructions or not label_name:
-        return fragment_response("fragments/prompts_list.html",
-                                 {"prompts": db.list_prompts(),
-                                  "accounts": _safe_accounts()},
-                                 toast={"message": "name, instructions, and label_name are required",
-                                        "type": "error"})
+        return fragment_response(
+            "fragments/prompts_list.html",
+            {"prompts": db.list_prompts(), "accounts": _safe_accounts()},
+            toast={"message": "name, instructions, and label_name are required", "type": "error"},
+        )
     account_id = f.get("account_id") or None
     db.create_prompt(
-        name, instructions, label_name,
+        name,
+        instructions,
+        label_name,
         action_archive=int(bool(f.get("action_archive"))),
         action_spam=int(bool(f.get("action_spam"))),
         action_trash=int(bool(f.get("action_trash"))),
@@ -386,9 +407,9 @@ def frag_create_prompt():
     db.add_log("INFO", f"Prompt created: {name} → label '{label_name}' ({scope})")
     prompts = db.list_prompts()
     accounts = _safe_accounts()
-    return fragment_response("fragments/prompts_list.html",
-                             {"prompts": prompts, "accounts": accounts},
-                             toast="Rule created.")
+    return fragment_response(
+        "fragments/prompts_list.html", {"prompts": prompts, "accounts": accounts}, toast="Rule created."
+    )
 
 
 @app.route("/fragments/prompts/<int:prompt_id>", methods=["PUT"])
@@ -400,7 +421,11 @@ def frag_update_prompt(prompt_id):
     active = int(f.get("active", 1))
     account_id = f.get("account_id") or None
     db.update_prompt(
-        prompt_id, name, instructions, label_name, active,
+        prompt_id,
+        name,
+        instructions,
+        label_name,
+        active,
         action_archive=int(bool(f.get("action_archive"))),
         action_spam=int(bool(f.get("action_spam"))),
         action_trash=int(bool(f.get("action_trash"))),
@@ -411,9 +436,9 @@ def frag_update_prompt(prompt_id):
     _ensure_label_for_accounts(int(account_id) if account_id else None, label_name)
     prompts = db.list_prompts()
     accounts = _safe_accounts()
-    return fragment_response("fragments/prompts_list.html",
-                             {"prompts": prompts, "accounts": accounts},
-                             toast="Rule updated.")
+    return fragment_response(
+        "fragments/prompts_list.html", {"prompts": prompts, "accounts": accounts}, toast="Rule updated."
+    )
 
 
 @app.route("/fragments/prompts/<int:prompt_id>", methods=["DELETE"])
@@ -421,9 +446,9 @@ def frag_delete_prompt(prompt_id):
     db.delete_prompt(prompt_id)
     prompts = db.list_prompts()
     accounts = _safe_accounts()
-    return fragment_response("fragments/prompts_list.html",
-                             {"prompts": prompts, "accounts": accounts},
-                             toast="Rule deleted.")
+    return fragment_response(
+        "fragments/prompts_list.html", {"prompts": prompts, "accounts": accounts}, toast="Rule deleted."
+    )
 
 
 @app.route("/fragments/prompts/<int:prompt_id>/toggle", methods=["POST"])
@@ -435,9 +460,9 @@ def frag_toggle_prompt(prompt_id):
     accounts = _safe_accounts()
     account_map = {a["id"]: a["email"] for a in accounts}
     msg = "Rule paused." if not new_active else "Rule resumed."
-    return fragment_response("fragments/prompt_card_view.html",
-                             {"p": p, "accounts": accounts, "account_map": account_map},
-                             toast=msg)
+    return fragment_response(
+        "fragments/prompt_card_view.html", {"p": p, "accounts": accounts, "account_map": account_map}, toast=msg
+    )
 
 
 @app.route("/fragments/prompts/<int:prompt_id>/edit")
@@ -447,8 +472,9 @@ def frag_prompt_edit(prompt_id):
         return "", 404
     accounts = _safe_accounts()
     account_map = {a["id"]: a["email"] for a in accounts}
-    return fragment_response("fragments/prompt_card_edit.html",
-                             {"p": p, "accounts": accounts, "account_map": account_map})
+    return fragment_response(
+        "fragments/prompt_card_edit.html", {"p": p, "accounts": accounts, "account_map": account_map}
+    )
 
 
 @app.route("/fragments/prompts/<int:prompt_id>/view")
@@ -458,17 +484,21 @@ def frag_prompt_view(prompt_id):
         return "", 404
     accounts = _safe_accounts()
     account_map = {a["id"]: a["email"] for a in accounts}
-    return fragment_response("fragments/prompt_card_view.html",
-                             {"p": p, "accounts": accounts, "account_map": account_map})
+    return fragment_response(
+        "fragments/prompt_card_view.html", {"p": p, "accounts": accounts, "account_map": account_map}
+    )
 
 
 @app.route("/fragments/settings")
 def frag_get_settings():
-    return fragment_response("fragments/settings_form.html", {
-        "poll_interval": int(db.get_setting("poll_interval", str(POLL_INTERVAL))),
-        "ollama_model": OLLAMA_MODEL,
-        "ollama_host": OLLAMA_HOST,
-    })
+    return fragment_response(
+        "fragments/settings_form.html",
+        {
+            "poll_interval": int(db.get_setting("poll_interval", str(POLL_INTERVAL))),
+            "ollama_model": OLLAMA_MODEL,
+            "ollama_host": OLLAMA_HOST,
+        },
+    )
 
 
 @app.route("/fragments/settings", methods=["PATCH"])
@@ -477,20 +507,27 @@ def frag_update_settings():
     if "poll_interval" in f:
         val = int(f["poll_interval"])
         if val < MIN_POLL_INTERVAL:
-            return fragment_response("fragments/settings_form.html", {
-                "poll_interval": val,
-                "ollama_model": OLLAMA_MODEL,
-                "ollama_host": OLLAMA_HOST,
-            }, toast={"message": f"Minimum poll interval is {MIN_POLL_INTERVAL} seconds",
-                      "type": "error"})
+            return fragment_response(
+                "fragments/settings_form.html",
+                {
+                    "poll_interval": val,
+                    "ollama_model": OLLAMA_MODEL,
+                    "ollama_host": OLLAMA_HOST,
+                },
+                toast={"message": f"Minimum poll interval is {MIN_POLL_INTERVAL} seconds", "type": "error"},
+            )
         db.set_setting("poll_interval", str(val))
         db.add_log("INFO", f"Settings updated: poll_interval={val}s")
         poller.update_interval(val)
-    return fragment_response("fragments/settings_form.html", {
-        "poll_interval": int(db.get_setting("poll_interval", str(POLL_INTERVAL))),
-        "ollama_model": OLLAMA_MODEL,
-        "ollama_host": OLLAMA_HOST,
-    }, toast="Settings saved.")
+    return fragment_response(
+        "fragments/settings_form.html",
+        {
+            "poll_interval": int(db.get_setting("poll_interval", str(POLL_INTERVAL))),
+            "ollama_model": OLLAMA_MODEL,
+            "ollama_host": OLLAMA_HOST,
+        },
+        toast="Settings saved.",
+    )
 
 
 @app.route("/fragments/logs")
@@ -515,8 +552,7 @@ def frag_history():
     )
     for r in rows:
         r["extra_actions"] = [
-            s for a in (r.get("actions") or "").split(",")
-            if (s := a.strip()) and not s.startswith("labeled →")
+            s for a in (r.get("actions") or "").split(",") if (s := a.strip()) and not s.startswith("labeled →")
         ]
     return fragment_response("fragments/history_table.html", {"rows": rows})
 
@@ -525,8 +561,7 @@ def frag_history():
 def frag_history_filters():
     accounts = _safe_accounts()
     prompts = db.list_prompts()
-    return fragment_response("fragments/history_filters.html",
-                             {"accounts": accounts, "prompts": prompts})
+    return fragment_response("fragments/history_filters.html", {"accounts": accounts, "prompts": prompts})
 
 
 def _retention_panel(account_id, account=None, service=None, toast=None):
@@ -534,22 +569,22 @@ def _retention_panel(account_id, account=None, service=None, toast=None):
         account = db.get_account(account_id)
     retention = db.get_retention(account_id)
     if account is None:
-        return fragment_response("fragments/retention_panel.html",
-                                 {"retention": retention, "account_id": account_id,
-                                  "gmail_labels": []},
-                                 toast=toast)
+        return fragment_response(
+            "fragments/retention_panel.html",
+            {"retention": retention, "account_id": account_id, "gmail_labels": []},
+            toast=toast,
+        )
     try:
         if service is None:
-            service, refreshed = gmail_client.get_service(account["credentials_json"])
-            if refreshed and refreshed != account["credentials_json"]:
-                db.update_account_credentials(account_id, refreshed)
+            service = gmail_client.get_service_and_refresh(account)
         gmail_labels = gmail_client.list_labels(service)
     except Exception:
         gmail_labels = []
-    return fragment_response("fragments/retention_panel.html",
-                             {"retention": retention, "account_id": account_id,
-                              "gmail_labels": gmail_labels},
-                             toast=toast)
+    return fragment_response(
+        "fragments/retention_panel.html",
+        {"retention": retention, "account_id": account_id, "gmail_labels": gmail_labels},
+        toast=toast,
+    )
 
 
 @app.route("/fragments/retention/<int:account_id>")
@@ -559,10 +594,7 @@ def frag_retention(account_id):
         return "", 404
     service = None
     try:
-        service, refreshed = gmail_client.get_service(account["credentials_json"])
-        if refreshed and refreshed != account["credentials_json"]:
-            db.update_account_credentials(account_id, refreshed)
-            account["credentials_json"] = refreshed
+        service = gmail_client.get_service_and_refresh(account)
     except Exception as e:
         db.add_log("WARNING", f"Could not refresh credentials for account {account_id}: {e}")
     return _retention_panel(account_id, account, service=service)
@@ -579,8 +611,7 @@ def frag_set_retention(account_id):
         value = int(f.get("value", 1))
         days = value * 365 if f.get("unit") == "years" else value
         if days < 1:
-            return _retention_panel(account_id, account,
-                                    toast={"message": "Days must be at least 1.", "type": "error"})
+            return _retention_panel(account_id, account, toast={"message": "Days must be at least 1.", "type": "error"})
         db.set_global_retention(account_id, days)
     else:
         db.clear_global_retention(account_id)
@@ -597,8 +628,7 @@ def frag_add_label_retention(account_id):
     label_name = (f.get("label_name") or "").strip()
     value = f.get("value", "")
     if not label_name or not value:
-        return _retention_panel(account_id, account,
-                                toast={"message": "Label and days are required.", "type": "error"})
+        return _retention_panel(account_id, account, toast={"message": "Label and days are required.", "type": "error"})
     days = int(value) * 365 if f.get("unit") == "years" else int(value)
     if days >= 1:
         db.add_label_retention(account_id, label_name, days)
@@ -637,10 +667,14 @@ def frag_oauth_start():
         return fragment_response("fragments/oauth_step2.html", {"auth_url": auth_url})
     except FileNotFoundError:
         resp = make_response("credentials.json not found.", 500)
-        resp.headers["HX-Trigger"] = json.dumps({"showToast": {
-            "message": "credentials.json not found. Place your Google OAuth credentials file at /credentials/credentials.json.",
-            "type": "error"
-        }})
+        resp.headers["HX-Trigger"] = json.dumps(
+            {
+                "showToast": {
+                    "message": "credentials.json not found. Place your Google OAuth credentials file at /credentials/credentials.json.",
+                    "type": "error",
+                }
+            }
+        )
         return resp
     except Exception as e:
         resp = make_response(str(e), 500)
@@ -666,12 +700,16 @@ def frag_oauth_exchange():
         return resp
     if not code:
         resp = make_response("", 400)
-        resp.headers["HX-Trigger"] = json.dumps({"showToast": {"message": "No authorization code found in the URL.", "type": "error"}})
+        resp.headers["HX-Trigger"] = json.dumps(
+            {"showToast": {"message": "No authorization code found in the URL.", "type": "error"}}
+        )
         return resp
     expected_state = session.get("oauth_state")
     if not expected_state or state != expected_state:
         resp = make_response("", 400)
-        resp.headers["HX-Trigger"] = json.dumps({"showToast": {"message": "State mismatch. Please start the authorization process again.", "type": "error"}})
+        resp.headers["HX-Trigger"] = json.dumps(
+            {"showToast": {"message": "State mismatch. Please start the authorization process again.", "type": "error"}}
+        )
         return resp
     try:
         email, credentials_json = gmail_client.exchange_code(state, code)
@@ -679,10 +717,12 @@ def frag_oauth_exchange():
         db.add_log("INFO", f"Account connected: {email}")
         accounts = _safe_accounts()
         resp = make_response(render_template("fragments/accounts_list.html", accounts=accounts))
-        resp.headers["HX-Trigger"] = json.dumps({
-            "showToast": {"message": f"{email} connected.", "type": "success"},
-            "closeOAuthPanel": True,
-        })
+        resp.headers["HX-Trigger"] = json.dumps(
+            {
+                "showToast": {"message": f"{email} connected.", "type": "success"},
+                "closeOAuthPanel": True,
+            }
+        )
         return resp
     except Exception as e:
         db.add_log("ERROR", f"OAuth exchange failed: {e}")
@@ -696,10 +736,9 @@ def frag_scan():
     db.add_log("INFO", "Manual scan triggered.")
     poller.run_now()
     resp = make_response("", 204)
-    resp.headers["HX-Trigger"] = json.dumps({"showToast": {
-        "message": "Scan triggered. Check logs for results.",
-        "type": "success"
-    }})
+    resp.headers["HX-Trigger"] = json.dumps(
+        {"showToast": {"message": "Scan triggered. Check logs for results.", "type": "success"}}
+    )
     return resp
 
 
@@ -713,10 +752,7 @@ def frag_account_options():
         first = '<option value="">Select an account\u2026</option>'
     else:
         first = '<option value="">All accounts</option>'
-    options = first + "".join(
-        f'<option value="{a["id"]}">{_html.escape(a["email"])}</option>'
-        for a in accounts
-    )
+    options = first + "".join(f'<option value="{a["id"]}">{_html.escape(a["email"])}</option>' for a in accounts)
     return Response(options, content_type="text/html")
 
 
@@ -731,15 +767,14 @@ def frag_retention_query():
         return Response("", content_type="text/html")
     retention = db.get_retention(account_id)
     try:
-        service, refreshed_creds = gmail_client.get_service(account["credentials_json"])
-        if refreshed_creds and refreshed_creds != account["credentials_json"]:
-            db.update_account_credentials(account_id, refreshed_creds)
+        service = gmail_client.get_service_and_refresh(account)
         gmail_labels = gmail_client.list_labels(service)
     except Exception:
         gmail_labels = []
-    return fragment_response("fragments/retention_panel.html",
-                             {"retention": retention, "account_id": account_id,
-                              "gmail_labels": gmail_labels})
+    return fragment_response(
+        "fragments/retention_panel.html",
+        {"retention": retention, "account_id": account_id, "gmail_labels": gmail_labels},
+    )
 
 
 @app.route("/api/prompts/generate-stream")
@@ -754,7 +789,7 @@ def api_generate_prompt_stream():
             for event in _llm.stream_generate_prompt_instruction(description):
                 event_type = event.get("type", "content")
                 text = event.get("text", "")
-                lines = ["event: " + event_type] + [f"data: {l}" for l in text.split("\n")] + ["", ""]
+                lines = ["event: " + event_type] + [f"data: {line}" for line in text.split("\n")] + ["", ""]
                 yield "\n".join(lines)
             yield "event: done\ndata: \n\n"
         except Exception as e:
@@ -766,6 +801,7 @@ def api_generate_prompt_stream():
 
 
 # ---- Startup ----
+
 
 def _get_or_create_secret_key() -> str:
     """Generate a stable secret key on first run and persist it in the DB."""
@@ -780,6 +816,7 @@ def create_app():
     db.init_db()
     app.secret_key = _get_or_create_secret_key()
     import threading
+
     threading.Thread(target=_llm.ensure_model_pulled, daemon=True).start()
     poller.start()
     return app

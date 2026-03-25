@@ -1,12 +1,19 @@
 import json
 import re
+
 import ollama as _ollama
 from tenacity import retry, stop_after_attempt, wait_exponential
+
 from app import db
+from app.config import (
+    DEBUG_LOGGING,
+    OLLAMA_GENERATE_NUM_PREDICT,
+    OLLAMA_HOST,
+    OLLAMA_MODEL,
+    OLLAMA_NUM_CTX,
+    OLLAMA_TIMEOUT,
+)
 from app.llm.base import LLMProvider
-from app.config import (OLLAMA_HOST, OLLAMA_MODEL, OLLAMA_TIMEOUT,
-                        OLLAMA_NUM_CTX, OLLAMA_NUM_PREDICT, OLLAMA_GENERATE_NUM_PREDICT,
-                        DEBUG_LOGGING)
 
 _client = _ollama.Client(host=OLLAMA_HOST, timeout=OLLAMA_TIMEOUT)
 
@@ -28,31 +35,28 @@ class OllamaProvider(LLMProvider):
             models = [m.model for m in _client.list().models]
             model_base = OLLAMA_MODEL.split(":")[0]
             if not any(m.startswith(model_base) for m in models):
-                print(f"Pulling model {OLLAMA_MODEL} from Ollama... (this may take a while)")
+                db.add_log("INFO", f"Pulling model {OLLAMA_MODEL} from Ollama... (this may take a while)")
                 _client.pull(OLLAMA_MODEL)
-                print(f"Model {OLLAMA_MODEL} ready.")
+                db.add_log("INFO", f"Model {OLLAMA_MODEL} ready.")
         except Exception as e:
-            print(f"Warning: could not check/pull Ollama model: {e}")
+            db.add_log("WARNING", f"Could not check/pull Ollama model: {e}")
 
     def classify_email_batch(self, email: dict, prompts: list) -> dict:
         if not prompts:
             return {}
 
-        rules_text = "\n".join(
-            f"{i+1}. {p['name']}: {p['instructions']}"
-            for i, p in enumerate(prompts)
-        )
-        example = ", ".join(f'"{i+1}": false' for i in range(min(2, len(prompts))))
+        rules_text = "\n".join(f"{i + 1}. {p['name']}: {p['instructions']}" for i, p in enumerate(prompts))
+        example = ", ".join(f'"{i + 1}": false' for i in range(min(2, len(prompts))))
         prompt = f"""You are an email classification assistant. You will be given an email and a list of labeling rules. For each rule, decide if the label should be applied to this email.
 
 Rules:
 {rules_text}
 
 Email:
-From: {email['sender']}
-Subject: {email['subject']}
+From: {email["sender"]}
+Subject: {email["subject"]}
 Body:
-{email['body'] or email['snippet']}
+{email["body"] or email["snippet"]}
 
 Respond with ONLY a JSON object where each key is the rule's number (1, 2, 3...) and the value is true or false.
 Example: {{{example}}}
@@ -95,11 +99,9 @@ No explanation, no markdown, just the JSON object."""
                 return parsed
             except Exception as e:
                 db.add_log("ERROR", f"LLM parse error: {e!r} | raw: {raw!r}")
-                print(f"Warning: could not parse LLM batch response: {e!r} | raw: {raw!r}")
                 return {p["id"]: False for p in prompts}
         except Exception as e:
             db.add_log("ERROR", f"LLM request failed: {e!r}")
-            print(f"Warning: LLM request failed: {e!r}")
             return {p["id"]: False for p in prompts}
 
     def _build_messages(self, description: str) -> list:
@@ -153,7 +155,7 @@ No explanation, no markdown, just the JSON object."""
             else:
                 if idx > 0:
                     events.append(("think" if in_think else "content", buffer[:idx]))
-                buffer = buffer[idx + len(tag):]
+                buffer = buffer[idx + len(tag) :]
                 in_think = not in_think
         return events, buffer, in_think
 
@@ -184,5 +186,5 @@ No explanation, no markdown, just the JSON object."""
             options=self._generate_options(),
         )
         content = response.message.content.strip()
-        content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+        content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
         return content

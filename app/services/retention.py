@@ -28,9 +28,7 @@ def cleanup_retention(account: dict, service) -> None:
 
         if retention["global_days"]:
             excluded = list({rule["label_name"] for rule in retention["labels"]} | exempt_names)
-            ids = gmail_client.fetch_emails_older_than(
-                service, retention["global_days"], excluded_labels=excluded
-            )
+            ids = gmail_client.fetch_emails_older_than(service, retention["global_days"], excluded_labels=excluded)
             new_ids = [i for i in ids if i not in trashed_ids]
             if new_ids:
                 gmail_client.batch_trash_emails(service, new_ids)

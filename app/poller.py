@@ -1,11 +1,13 @@
-import time
 import datetime
+import time
+
 from apscheduler.schedulers.background import BackgroundScheduler
+
 from app import db
+from app.config import GMAIL_LOOKBACK_HOURS, POLL_INTERVAL
 from app.llm import get_provider
 from app.services.email_processor import process_account
 from app.services.retention import cleanup_retention
-from app.config import POLL_INTERVAL, GMAIL_LOOKBACK_HOURS
 
 _scheduler = BackgroundScheduler(daemon=True)
 _last_run: float | None = None
@@ -28,8 +30,12 @@ def start() -> None:
         return
     interval = int(db.get_setting("poll_interval", str(POLL_INTERVAL)))
     _scheduler.add_job(
-        _run_scan, "interval", seconds=interval, id="poll",
-        max_instances=1, replace_existing=True,
+        _run_scan,
+        "interval",
+        seconds=interval,
+        id="poll",
+        max_instances=1,
+        replace_existing=True,
         next_run_time=datetime.datetime.now(),
     )
     _scheduler.start()

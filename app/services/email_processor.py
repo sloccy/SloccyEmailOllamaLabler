@@ -1,7 +1,7 @@
 from app import db, gmail_client
+from app.config import GMAIL_LOOKBACK_HOURS, GMAIL_MAX_RESULTS
 from app.db import get_db
 from app.llm.base import LLMProvider
-from app.config import GMAIL_MAX_RESULTS, GMAIL_LOOKBACK_HOURS
 
 
 def process_account(account: dict, prompts: list, provider: LLMProvider):
@@ -10,9 +10,7 @@ def process_account(account: dict, prompts: list, provider: LLMProvider):
     account_id = account["id"]
     email_addr = account["email"]
 
-    service, refreshed_creds = gmail_client.get_service(account["credentials_json"])
-    if refreshed_creds is not None:
-        db.update_account_credentials(account_id, refreshed_creds)
+    service = gmail_client.get_service_and_refresh(account)
 
     all_ids = gmail_client.list_recent_message_ids(
         service, max_results=GMAIL_MAX_RESULTS, lookback_hours=GMAIL_LOOKBACK_HOURS
@@ -47,8 +45,9 @@ def process_account(account: dict, prompts: list, provider: LLMProvider):
     return service
 
 
-def _process_email(email: dict, account_id: int, email_addr: str,
-                   prompts: list, label_cache: dict, provider: LLMProvider) -> tuple:
+def _process_email(
+    email: dict, account_id: int, email_addr: str, prompts: list, label_cache: dict, provider: LLMProvider
+) -> tuple:
     """Classify an email and write DB records. Returns (modifies, trashes) for batched Gmail calls."""
     modifies = []
     trashes = []
@@ -95,35 +94,46 @@ def _process_email(email: dict, account_id: int, email_addr: str,
                     actions_taken.append("stopped further rules")
                     stop = True
 
-                pending_logs.append((
-                    "INFO",
-                    f"[{email_addr}] '{email['subject'][:60]}' — {', '.join(actions_taken)} (rule: {prompt['name']})",
-                ))
-                pending_cats.append({
-                    "account_id": account_id,
-                    "account_email": email_addr,
-                    "message_id": email["id"],
-                    "subject": email.get("subject", ""),
-                    "sender": email.get("sender", ""),
-                    "prompt_id": prompt["id"],
-                    "prompt_name": prompt["name"],
-                    "label_name": prompt["label_name"],
-                    "actions": ", ".join(actions_taken),
-                })
+                pending_logs.append(
+                    (
+                        "INFO",
+                        f"[{email_addr}] '{email['subject'][:60]}' — {', '.join(actions_taken)} (rule: {prompt['name']})",
+                    )
+                )
+                pending_cats.append(
+                    {
+                        "account_id": account_id,
+                        "account_email": email_addr,
+                        "message_id": email["id"],
+                        "subject": email.get("subject", ""),
+                        "sender": email.get("sender", ""),
+                        "prompt_id": prompt["id"],
+                        "prompt_name": prompt["name"],
+                        "label_name": prompt["label_name"],
+                        "actions": ", ".join(actions_taken),
+                    }
+                )
 
         with get_db() as conn:
             for level, message in pending_logs:
-                conn.execute(
-                    "INSERT INTO logs (level, message) VALUES (?, ?)", (level, message)
-                )
+                conn.execute("INSERT INTO logs (level, message) VALUES (?, ?)", (level, message))
             for c in pending_cats:
                 conn.execute(
                     """INSERT INTO categorization_history
                        (account_id, account_email, message_id, subject, sender,
                         prompt_id, prompt_name, label_name, actions)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (c["account_id"], c["account_email"], c["message_id"], c["subject"],
-                     c["sender"], c["prompt_id"], c["prompt_name"], c["label_name"], c["actions"]),
+                    (
+                        c["account_id"],
+                        c["account_email"],
+                        c["message_id"],
+                        c["subject"],
+                        c["sender"],
+                        c["prompt_id"],
+                        c["prompt_name"],
+                        c["label_name"],
+                        c["actions"],
+                    ),
                 )
             conn.execute(
                 "INSERT OR IGNORE INTO processed_emails (account_id, message_id) VALUES (?, ?)",

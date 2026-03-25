@@ -1,17 +1,17 @@
-import logging
-import os
-import json
 import base64
 import datetime
-from cachetools import TTLCache
-from googleapiclient.discovery import build
-from google.oauth2.credentials import Credentials
-from google.auth.transport.requests import Request
-from google_auth_oauthlib.flow import Flow
-from app.config import GMAIL_MAX_RESULTS, GMAIL_LOOKBACK_HOURS, EMAIL_BODY_TRUNCATION
+import json
+import os
 import time
 
-_log = logging.getLogger(__name__)
+from cachetools import TTLCache
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import Flow
+from googleapiclient.discovery import build
+
+from app import db
+from app.config import EMAIL_BODY_TRUNCATION, GMAIL_LOOKBACK_HOURS, GMAIL_MAX_RESULTS
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.modify",
@@ -61,6 +61,14 @@ def get_service(credentials_json: str):
     return service, refreshed
 
 
+def get_service_and_refresh(account: dict):
+    """Load/refresh credentials, persist if refreshed, return the Gmail service."""
+    service, refreshed = get_service(account["credentials_json"])
+    if refreshed is not None:
+        db.update_account_credentials(account["id"], refreshed)
+    return service
+
+
 def _cache_key(service) -> str:
     return service._sk
 
@@ -68,16 +76,21 @@ def _cache_key(service) -> str:
 def build_label_cache(service, label_names: list) -> dict:
     """Return {name: id} for the given label names, creating any that are missing."""
     all_labels = list_labels(service)
-    existing = {l["name"].lower(): l["id"] for l in all_labels}
+    existing = {lbl["name"].lower(): lbl["id"] for lbl in all_labels}
     cache = {}
     for name in label_names:
         if name.lower() in existing:
             cache[name] = existing[name.lower()]
         else:
-            created = service.users().labels().create(
-                userId="me",
-                body={"name": name, "labelListVisibility": "labelShow", "messageListVisibility": "show"},
-            ).execute()
+            created = (
+                service.users()
+                .labels()
+                .create(
+                    userId="me",
+                    body={"name": name, "labelListVisibility": "labelShow", "messageListVisibility": "show"},
+                )
+                .execute()
+            )
             cache[name] = created["id"]
             _label_cache.pop(_cache_key(service), None)
     return cache
@@ -85,11 +98,16 @@ def build_label_cache(service, label_names: list) -> dict:
 
 def list_recent_message_ids(service, max_results=GMAIL_MAX_RESULTS, lookback_hours=GMAIL_LOOKBACK_HOURS) -> list:
     after_ts = int(time.time() - lookback_hours * 3600)
-    response = service.users().messages().list(
-        userId="me",
-        maxResults=max_results,
-        q=f"in:inbox after:{after_ts}",
-    ).execute()
+    response = (
+        service.users()
+        .messages()
+        .list(
+            userId="me",
+            maxResults=max_results,
+            q=f"in:inbox after:{after_ts}",
+        )
+        .execute()
+    )
     return [m["id"] for m in response.get("messages", [])]
 
 
@@ -102,11 +120,11 @@ def fetch_message_details(service, message_ids: list) -> list:
         if exception is None:
             results[request_id] = response
         else:
-            _log.warning("Batch fetch failed for message %s: %s", request_id, exception)
+            db.add_log("WARNING", f"Batch fetch failed for message {request_id}: {exception}")
 
     for i in range(0, len(message_ids), 100):
         batch = service.new_batch_http_request(callback=_callback)
-        for msg_id in message_ids[i:i + 100]:
+        for msg_id in message_ids[i : i + 100]:
             batch.add(
                 service.users().messages().get(userId="me", id=msg_id, format="full"),
                 request_id=msg_id,
@@ -120,13 +138,15 @@ def fetch_message_details(service, message_ids: list) -> list:
             continue
         headers = {h["name"]: h["value"] for h in full["payload"]["headers"]}
         body = _extract_body(full["payload"])
-        emails.append({
-            "id": msg_id,
-            "subject": headers.get("Subject", "(no subject)"),
-            "sender": headers.get("From", "unknown"),
-            "snippet": full.get("snippet", ""),
-            "body": body[:EMAIL_BODY_TRUNCATION],
-        })
+        emails.append(
+            {
+                "id": msg_id,
+                "subject": headers.get("Subject", "(no subject)"),
+                "sender": headers.get("From", "unknown"),
+                "snippet": full.get("snippet", ""),
+                "body": body[:EMAIL_BODY_TRUNCATION],
+            }
+        )
     return emails
 
 
@@ -136,7 +156,7 @@ def list_labels(service) -> list:
         return _label_cache[key]
     result = service.users().labels().list(userId="me").execute()
     labels = sorted(
-        [{"id": l["id"], "name": l["name"]} for l in result.get("labels", [])],
+        [{"id": lbl["id"], "name": lbl["name"]} for lbl in result.get("labels", [])],
         key=lambda x: x["name"].lower(),
     )
     _label_cache[key] = labels
@@ -170,7 +190,7 @@ def batch_modify_emails(service, modifications: list) -> None:
         groups.setdefault(key, []).append(message_id)
     for (add_labels, remove_labels), message_ids in groups.items():
         for i in range(0, len(message_ids), 1000):
-            body: dict = {"ids": message_ids[i:i + 1000]}
+            body: dict = {"ids": message_ids[i : i + 1000]}
             if add_labels:
                 body["addLabelIds"] = list(add_labels)
             if remove_labels:

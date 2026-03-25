@@ -112,7 +112,6 @@ services:
       - DATA_DIR=/data
       - CREDENTIALS_FILE=/credentials/credentials.json
       - BASE_URL=http://localhost:5001
-      - FLASK_SECRET_KEY=change-me-to-a-random-string
       # Optional overrides — see Configuration Reference below
       # - GMAIL_LOOKBACK_HOURS=24
       # - GMAIL_MAX_RESULTS=50
@@ -130,7 +129,7 @@ networks:
   internal:
 ```
 
-Set `BASE_URL` to match the redirect URI you registered in Google Cloud. Set `FLASK_SECRET_KEY` to any long random string (used to sign session cookies).
+Set `BASE_URL` to match the redirect URI you registered in Google Cloud (e.g., `http://localhost:5001`).
 
 ---
 
@@ -181,7 +180,6 @@ export OLLAMA_HOST=http://localhost:11434
 export DATA_DIR=./data
 export CREDENTIALS_FILE=./credentials/credentials.json
 export BASE_URL=http://localhost:5000
-export FLASK_SECRET_KEY=dev-secret
 
 # Run the app
 python -c "from app.server import create_app; create_app().run(host='0.0.0.0', port=5000, debug=True)"
@@ -264,7 +262,7 @@ All settings are controlled via environment variables.
 |---|---|
 | Backend | Python 3.14 / Flask 3 |
 | WSGI server | Waitress |
-| UI | Bulma 1.0 (dark mode) + HTMX 2.0 |
+| UI | Bootstrap 5.3 (dark mode) + HTMX 2.0 |
 | Database | SQLite (raw SQL, no ORM) |
 | LLM runtime | Ollama |
 | Gmail integration | Google OAuth 2.0 + Gmail API |
