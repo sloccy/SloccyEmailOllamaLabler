@@ -119,6 +119,10 @@ def index():
 
 
 def _ensure_label_for_accounts(account_id, label_name):
+    thread_name = f"ensure_label_{account_id}_{label_name}"
+    if any(t.name == thread_name and t.is_alive() for t in threading.enumerate()):
+        return
+
     def _do():
         if account_id is not None:
             accounts = [db.get_account(account_id)]
@@ -133,7 +137,7 @@ def _ensure_label_for_accounts(account_id, label_name):
             except Exception as e:
                 db.add_log("WARNING", f"Could not pre-create label '{label_name}' for account {account.get('id')}: {e}")
 
-    threading.Thread(target=_do, daemon=True).start()
+    threading.Thread(target=_do, daemon=True, name=thread_name).start()
 
 
 # ---- API routes (fetch / download) ----
@@ -752,8 +756,9 @@ def api_generate_prompt_stream():
         if not description:
             yield "event: done\ndata: \n\n"
             return
+        stream = _llm.stream_generate_prompt_instruction(description)
         try:
-            for event in _llm.stream_generate_prompt_instruction(description):
+            for event in stream:
                 event_type = event.get("type", "content")
                 text = event.get("text", "")
                 lines = ["event: " + event_type] + [f"data: {line}" for line in text.split("\n")] + ["", ""]
@@ -763,6 +768,8 @@ def api_generate_prompt_stream():
             db.add_log("ERROR", f"Prompt generation failed: {e}")
             yield "event: error\ndata: Generation failed. Check Ollama is running.\n\n"
             yield "event: done\ndata: \n\n"
+        finally:
+            stream.close()
 
     return Response(generate(), content_type="text/event-stream")
 
