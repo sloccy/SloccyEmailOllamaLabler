@@ -71,7 +71,9 @@ def _run_scan() -> None:
     provider = get_provider()
     all_prompts = db.list_prompts()
     for account in accounts:
-        prompts = [p for p in all_prompts if p["active"] and (p["account_id"] is None or p["account_id"] == account["id"])]
+        prompts = [
+            p for p in all_prompts if p["active"] and (p["account_id"] is None or p["account_id"] == account["id"])
+        ]
         if not prompts:
             db.add_log("INFO", f"[{account['email']}] No active prompts for this account.")
             continue
