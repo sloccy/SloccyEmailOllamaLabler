@@ -470,7 +470,9 @@ def frag_toggle_prompt(prompt_id):
     accounts = _safe_accounts()
     msg = "Rule paused." if not new_active else "Rule resumed."
     return fragment_response(
-        "fragments/prompt_card_view.html", {"p": p, "accounts": accounts, "account_map": _account_map(accounts)}, toast=msg
+        "fragments/prompt_card_view.html",
+        {"p": p, "accounts": accounts, "account_map": _account_map(accounts)},
+        toast=msg,
     )
 
 
