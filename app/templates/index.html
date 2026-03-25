@@ -456,7 +456,13 @@
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ordered_ids: orderedIds }),
     });
-    if (!resp.ok) {
+    if (resp.ok) {
+      const list = document.getElementById('prompts-list');
+      for (const id of orderedIds) {
+        const el = list.querySelector(`.card[data-id="${id}"]`);
+        if (el) list.appendChild(el);
+      }
+    } else {
       toast('Failed to save order.', 'error');
       const accountId = document.getElementById('prompt-filter-account')?.value || '';
       htmx.ajax('GET', accountId ? `/fragments/prompts?account_id=${accountId}` : '/fragments/prompts', { target: '#prompts-list', swap: 'innerHTML' });
