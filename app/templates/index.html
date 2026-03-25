@@ -174,7 +174,7 @@
           </div>
           <div class="mb-3">
             <label class="form-label">Instructions for the AI</label>
-            <textarea class="form-control form-control-sm" name="instructions" id="new-prompt-instructions" style="min-height:10rem" placeholder="Describe what kind of emails should get this label. Be specific."></textarea>
+            <textarea class="form-control form-control-sm textarea-tall" name="instructions" id="new-prompt-instructions" placeholder="Describe what kind of emails should get this label. Be specific."></textarea>
           </div>
           <div class="mb-3">
             <label class="form-label">Actions when matched</label>
@@ -222,8 +222,7 @@
             <div class="mb-4">
               <div class="font-monospace text-muted mb-2" style="font-size:11px;letter-spacing:0.05em;">&#9670; THINKING</div>
               <div id="builder-thinking" sse-swap="think" hx-swap="beforeend"
-                class="bg-base-300 border rounded p-3 font-monospace text-muted"
-                style="font-size:12px;white-space:pre-wrap;max-height:180px;overflow-y:auto;line-height:1.6;"></div>
+                class="builder-thinking bg-base-300 border rounded p-3 font-monospace text-muted"></div>
             </div>
             <h6 class="section-title">Generated instruction</h6>
             <div class="mb-3">

@@ -5,12 +5,11 @@
     <div class="timeline-middle">
       <span class="tag-dot badge {% if l.level == 'ERROR' %}text-bg-danger{% elif l.level == 'INFO' %}text-bg-primary{% else %}text-bg-secondary{% endif %}"></span>
     </div>
-    <div class="timeline-end font-monospace" style="font-size:0.75rem">
+    <div class="timeline-end font-monospace">
       <span class="opacity-50 me-2">{{ l.timestamp|fmtdate }}</span>
       <span class="fw-semibold me-2 {% if l.level == 'ERROR' %}text-danger{% elif l.level == 'INFO' %}text-primary{% else %}opacity-25{% endif %}">{{ l.level }}</span>
       <span class="text-break">{{ l.message|e }}</span>
     </div>
-    <hr class="opacity-10"/>
   </li>
   {% endfor %}
 </ul>

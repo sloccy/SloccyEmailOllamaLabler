@@ -48,7 +48,10 @@ function handleConfigImport(input) {
       const el = document.getElementById('import-result');
       el.style.display = '';
       if (data.error) {
-        el.innerHTML = '<div class="small text-danger">' + data.error + '</div>';
+        const err = document.createElement('div');
+        err.className = 'small text-danger';
+        err.textContent = data.error;
+        el.replaceChildren(err);
         return;
       }
       const s = data.summary;

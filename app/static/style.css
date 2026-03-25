@@ -179,7 +179,7 @@ h1,h2,h3,h4,h5,h6 { letter-spacing: -0.025em; }
 .timeline { list-style: none; padding: 0; margin: 0; }
 .timeline li { display: grid; grid-template-columns: 20px 1fr; gap: 0 0.75rem; align-items: start; }
 .timeline-middle { display: flex; justify-content: center; padding-top: 0.3rem; }
-.timeline-end { padding: 0.125rem 0 0.5rem; min-width: 0; }
+.timeline-end { padding: 0.125rem 0 0.5rem; min-width: 0; font-size: 0.75rem; }
 .timeline li hr { display: none; }
 .timeline-log-entry { transition: background 0.12s; border-radius: 4px; }
 .timeline-log-entry:hover { background: var(--hover-subtle-bg); }
@@ -197,6 +197,10 @@ h1,h2,h3,h4,h5,h6 { letter-spacing: -0.025em; }
 .btn-generating { animation: pulse-border 1.2s ease-in-out infinite; }
 .htmx-indicator { opacity: 0; transition: opacity 0.2s; }
 .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
+.builder-thinking { font-size: 12px; white-space: pre-wrap; max-height: 180px; overflow-y: auto; line-height: 1.6; }
+
+/* Textarea */
+.textarea-tall { min-height: 10rem; }
 
 /* App color helpers */
 .bg-base-200 { background-color: var(--om-bg-200); }

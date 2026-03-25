@@ -392,18 +392,6 @@ def get_logs_range(start, end):
 # ---- Categorization History ----
 
 
-def add_categorization(
-    account_id, account_email, message_id, subject, sender, prompt_id, prompt_name, label_name, actions
-):
-    _execute(
-        "INSERT INTO categorization_history"
-        " (account_id, account_email, message_id, subject, sender,"
-        "  prompt_id, prompt_name, label_name, actions)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (account_id, account_email, message_id, subject, sender, prompt_id, prompt_name, label_name, actions),
-    )
-
-
 def get_categorization_history(account_id=None, prompt_id=None, subject=None, sender=None, limit=200):
     wheres, params = [], []
     if account_id is not None:

@@ -738,19 +738,9 @@ def frag_retention_query():
     if not account_id:
         return Response("", content_type="text/html")
     account_id = int(account_id)
-    account = db.get_account(account_id)
-    if not account:
+    if not db.get_account(account_id):
         return Response("", content_type="text/html")
-    retention = db.get_retention(account_id)
-    try:
-        service = gmail_client.get_service_and_refresh(account)
-        gmail_labels = gmail_client.list_labels(service)
-    except Exception:
-        gmail_labels = []
-    return fragment_response(
-        "fragments/retention_panel.html",
-        {"retention": retention, "account_id": account_id, "gmail_labels": gmail_labels},
-    )
+    return _retention_panel(account_id)
 
 
 @app.route("/api/prompts/generate-stream")
@@ -791,8 +781,6 @@ def _get_or_create_secret_key() -> str:
 def create_app():
     db.init_db()
     app.secret_key = _get_or_create_secret_key()
-    import threading
-
     threading.Thread(target=_llm.ensure_model_pulled, daemon=True).start()
     poller.start()
     return app
