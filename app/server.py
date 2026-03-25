@@ -78,8 +78,10 @@ def _safe_accounts():
     return db.list_accounts_safe()
 
 
-def _account_map():
-    return {a["id"]: a["email"] for a in db.list_accounts_safe()}
+def _account_map(accounts=None):
+    if accounts is None:
+        accounts = db.list_accounts_safe()
+    return {a["id"]: a["email"] for a in accounts}
 
 
 def _htmx_toast(msg, category="error", status=400):
@@ -190,7 +192,7 @@ def api_export_prompts():
 @app.route("/api/config/export", methods=["GET"])
 def api_export_config():
     accounts_raw = db.list_accounts()
-    account_map = {a["id"]: a["email"] for a in accounts_raw}
+    account_map = _account_map(accounts_raw)
 
     accounts_export = [{"email": a["email"], "active": a["active"]} for a in accounts_raw]
 
@@ -468,7 +470,7 @@ def frag_toggle_prompt(prompt_id):
     accounts = _safe_accounts()
     msg = "Rule paused." if not new_active else "Rule resumed."
     return fragment_response(
-        "fragments/prompt_card_view.html", {"p": p, "accounts": accounts, "account_map": _account_map()}, toast=msg
+        "fragments/prompt_card_view.html", {"p": p, "accounts": accounts, "account_map": _account_map(accounts)}, toast=msg
     )
 
 
@@ -479,7 +481,7 @@ def frag_prompt_edit(prompt_id):
         return "", 404
     accounts = _safe_accounts()
     return fragment_response(
-        "fragments/prompt_card_edit.html", {"p": p, "accounts": accounts, "account_map": _account_map()}
+        "fragments/prompt_card_edit.html", {"p": p, "accounts": accounts, "account_map": _account_map(accounts)}
     )
 
 
@@ -490,7 +492,7 @@ def frag_prompt_view(prompt_id):
         return "", 404
     accounts = _safe_accounts()
     return fragment_response(
-        "fragments/prompt_card_view.html", {"p": p, "accounts": accounts, "account_map": _account_map()}
+        "fragments/prompt_card_view.html", {"p": p, "accounts": accounts, "account_map": _account_map(accounts)}
     )
 
 

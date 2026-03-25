@@ -24,7 +24,6 @@ CREDENTIALS_FILE = os.getenv("CREDENTIALS_FILE", "/credentials/credentials.json"
 REDIRECT_URI = "http://localhost"
 
 _label_cache: TTLCache = TTLCache(maxsize=32, ttl=300)
-_service_keys: dict[int, str] = {}
 
 
 def _is_retryable(exc: BaseException) -> bool:
@@ -74,7 +73,7 @@ def get_service(credentials_json: str):
         creds.refresh(Request())
         refreshed = creds.to_json()
     service = build("gmail", "v1", credentials=creds)
-    _service_keys[id(service)] = creds.refresh_token
+    service._cache_key = creds.refresh_token
     return service, refreshed
 
 
@@ -87,7 +86,7 @@ def get_service_and_refresh(account: dict):
 
 
 def _cache_key(service) -> str:
-    return _service_keys[id(service)]
+    return service._cache_key
 
 
 def build_label_cache(service, label_names: list) -> dict:
