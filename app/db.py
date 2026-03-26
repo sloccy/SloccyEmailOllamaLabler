@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from app.config import LOG_RETENTION_DAYS, POLL_INTERVAL
 from app.models import (
     ALL_MODELS,
+    DB_PATH,
     Account,
     AccountRetention,
     CategorizationHistory,
@@ -13,7 +14,6 @@ from app.models import (
     Prompt,
     Setting,
     database,
-    DB_PATH,
     fn,
 )
 
@@ -72,7 +72,9 @@ def update_account_credentials(account_id, credentials_json):
 
 
 def update_last_scan(account_id):
-    Account.update(last_scan_at=datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")).where(Account.id == account_id).execute()
+    Account.update(last_scan_at=datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")).where(
+        Account.id == account_id
+    ).execute()
 
 
 def delete_account(account_id):
@@ -109,28 +111,55 @@ def get_prompt(prompt_id):
 
 
 def create_prompt(
-    name, instructions, label_name,
-    action_archive=0, action_spam=0, action_trash=0, action_mark_read=0,
-    stop_processing=0, account_id=None,
+    name,
+    instructions,
+    label_name,
+    action_archive=0,
+    action_spam=0,
+    action_trash=0,
+    action_mark_read=0,
+    stop_processing=0,
+    account_id=None,
 ):
     max_order = Prompt.select(fn.MAX(Prompt.sort_order)).scalar() or 0
     Prompt.create(
-        name=name, instructions=instructions, label_name=label_name,
-        action_archive=action_archive, action_spam=action_spam, action_trash=action_trash,
-        action_mark_read=action_mark_read, sort_order=max_order + 1,
-        stop_processing=stop_processing, account_id=account_id,
+        name=name,
+        instructions=instructions,
+        label_name=label_name,
+        action_archive=action_archive,
+        action_spam=action_spam,
+        action_trash=action_trash,
+        action_mark_read=action_mark_read,
+        sort_order=max_order + 1,
+        stop_processing=stop_processing,
+        account_id=account_id,
     )
 
 
 def update_prompt(
-    prompt_id, name, instructions, label_name, active,
-    action_archive=0, action_spam=0, action_trash=0, action_mark_read=0,
-    stop_processing=0, account_id=None,
+    prompt_id,
+    name,
+    instructions,
+    label_name,
+    active,
+    action_archive=0,
+    action_spam=0,
+    action_trash=0,
+    action_mark_read=0,
+    stop_processing=0,
+    account_id=None,
 ):
     Prompt.update(
-        name=name, instructions=instructions, label_name=label_name, active=active,
-        action_archive=action_archive, action_spam=action_spam, action_trash=action_trash,
-        action_mark_read=action_mark_read, stop_processing=stop_processing, account_id=account_id,
+        name=name,
+        instructions=instructions,
+        label_name=label_name,
+        active=active,
+        action_archive=action_archive,
+        action_spam=action_spam,
+        action_trash=action_trash,
+        action_mark_read=action_mark_read,
+        stop_processing=stop_processing,
+        account_id=account_id,
     ).where(Prompt.id == prompt_id).execute()
 
 

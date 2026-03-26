@@ -1,7 +1,7 @@
 import os
 from datetime import UTC, datetime
 
-from peewee import AutoField, IntegerField, Model, SqliteDatabase, TextField, fn
+from peewee import AutoField, IntegerField, Model, SqliteDatabase, TextField
 
 DB_PATH = os.path.join(os.getenv("DATA_DIR", "/data"), "labeler.db")
 
@@ -124,6 +124,13 @@ class LabelExemption(BaseModel):
 
 
 ALL_MODELS = [
-    Account, Prompt, Setting, ProcessedEmail, Log,
-    CategorizationHistory, AccountRetention, LabelRetention, LabelExemption,
+    Account,
+    Prompt,
+    Setting,
+    ProcessedEmail,
+    Log,
+    CategorizationHistory,
+    AccountRetention,
+    LabelRetention,
+    LabelExemption,
 ]

@@ -28,6 +28,19 @@ def _inject_asset_version():
     return {"asset_v": _ASSET_VERSION}
 
 
+@app.before_request
+def _check_origin():
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return
+    origin = request.headers.get("Origin", "")
+    if not origin:
+        referer = request.headers.get("Referer", "")
+        parsed = urlparse(referer)
+        origin = f"{parsed.scheme}://{parsed.netloc}" if referer else ""
+    if origin and urlparse(origin).netloc != request.host:
+        return _htmx_toast("Cross-origin request blocked.", status=403)
+
+
 # ---- Fragment helpers ----
 
 
@@ -46,7 +59,7 @@ def _fmt_date(ts):
     try:
         s = ts.replace("Z", "") if ts.endswith("Z") else ts
         d = datetime.fromisoformat(s)
-        return d.strftime("%-d %b, %H:%M")
+        return f"{d.day} {d.strftime('%b')}, {d.strftime('%H:%M')}"
     except Exception:
         return str(ts)
 
@@ -408,7 +421,9 @@ def frag_prompts():
     account_id = request.args.get("account_id", "")
     prompts = db.list_prompts(account_id=int(account_id)) if account_id else db.list_prompts()
     accounts = _safe_accounts()
-    return fragment_response("fragments/prompts_list.html", {"prompts": prompts, "accounts": accounts, "account_map": _account_map(accounts)})
+    return fragment_response(
+        "fragments/prompts_list.html", {"prompts": prompts, "accounts": accounts, "account_map": _account_map(accounts)}
+    )
 
 
 @app.route("/fragments/prompts", methods=["POST"])
@@ -432,7 +447,9 @@ def frag_create_prompt():
     prompts = db.list_prompts()
     accounts = _safe_accounts()
     return fragment_response(
-        "fragments/prompts_list.html", {"prompts": prompts, "accounts": accounts, "account_map": _account_map(accounts)}, toast="Rule created."
+        "fragments/prompts_list.html",
+        {"prompts": prompts, "accounts": accounts, "account_map": _account_map(accounts)},
+        toast="Rule created.",
     )
 
 
@@ -449,7 +466,9 @@ def frag_update_prompt(prompt_id):
     prompts = db.list_prompts()
     accounts = _safe_accounts()
     return fragment_response(
-        "fragments/prompts_list.html", {"prompts": prompts, "accounts": accounts, "account_map": _account_map(accounts)}, toast="Rule updated."
+        "fragments/prompts_list.html",
+        {"prompts": prompts, "accounts": accounts, "account_map": _account_map(accounts)},
+        toast="Rule updated.",
     )
 
 
@@ -459,7 +478,9 @@ def frag_delete_prompt(prompt_id):
     prompts = db.list_prompts()
     accounts = _safe_accounts()
     return fragment_response(
-        "fragments/prompts_list.html", {"prompts": prompts, "accounts": accounts, "account_map": _account_map(accounts)}, toast="Rule deleted."
+        "fragments/prompts_list.html",
+        {"prompts": prompts, "accounts": accounts, "account_map": _account_map(accounts)},
+        toast="Rule deleted.",
     )
 
 
