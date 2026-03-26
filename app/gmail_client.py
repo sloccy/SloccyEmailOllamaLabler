@@ -115,17 +115,18 @@ def build_label_cache(service, label_names: list) -> dict:
 @_gmail_retry
 def list_recent_message_ids(service, max_results=GMAIL_MAX_RESULTS, lookback_hours=GMAIL_LOOKBACK_HOURS) -> list:
     after_ts = int(time.time() - lookback_hours * 3600)
-    response = (
-        service.users()
-        .messages()
-        .list(
-            userId="me",
-            maxResults=max_results,
-            q=f"in:inbox after:{after_ts}",
-        )
-        .execute()
-    )
-    return [m["id"] for m in response.get("messages", [])]
+    ids = []
+    request = service.users().messages().list(userId="me", maxResults=max_results, q=f"in:inbox after:{after_ts}")
+    while request is not None:
+        response = request.execute()
+        ids.extend(m["id"] for m in response.get("messages", []))
+        request = service.users().messages().list_next(request, response)
+    return ids
+
+
+@_gmail_retry
+def _execute_batch(batch) -> None:
+    batch.execute()
 
 
 def fetch_message_details(service, message_ids: list) -> list:
@@ -146,7 +147,7 @@ def fetch_message_details(service, message_ids: list) -> list:
                 service.users().messages().get(userId="me", id=msg_id, format="full"),
                 request_id=msg_id,
             )
-        batch.execute()
+        _execute_batch(batch)
 
     emails = []
     for msg_id in message_ids:
