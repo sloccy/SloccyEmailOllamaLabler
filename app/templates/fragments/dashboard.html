@@ -1,4 +1,4 @@
-<div class="stats mb-4">
+<div class="stats mb-4" data-poller-running="{{ poller_running|tojson }}">
   <div class="stat stat-accent-primary">
     <div class="stat-title">Accounts</div>
     <div class="stat-value text-primary font-monospace">{{ accounts|length }}</div>
@@ -20,16 +20,5 @@
     <div class="stat-desc">Scheduled</div>
   </div>
 </div>
-<script>
-  (function(){
-    var dot = document.getElementById('pollerDot');
-    var lbl = document.getElementById('pollerLabel');
-    {% if poller_running %}
-    dot.classList.add('active'); lbl.textContent = 'running';
-    {% else %}
-    dot.classList.remove('active'); lbl.textContent = 'stopped';
-    {% endif %}
-  })();
-</script>
 <h6 class="section-title">Recent Activity</h6>
 {% include 'fragments/logs_list.html' %}
