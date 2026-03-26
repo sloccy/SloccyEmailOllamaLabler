@@ -1,5 +1,3 @@
-{% set account_map = {} %}
-{% for a in accounts %}{% set _ = account_map.update({a.id: a.email}) %}{% endfor %}
 {% if prompts %}
   {% for p in prompts %}
     {% include 'fragments/prompt_card_view.html' %}
