@@ -61,6 +61,7 @@ def _run_scan() -> None:
     if now - _last_cleanup >= _CLEANUP_INTERVAL:
         db.trim_logs()
         db.trim_processed_emails(GMAIL_LOOKBACK_HOURS)
+        db.trim_categorization_history()
         _last_cleanup = now
 
     accounts = [a for a in db.list_accounts() if a["active"]]

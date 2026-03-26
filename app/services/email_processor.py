@@ -1,5 +1,6 @@
 from app import db, gmail_client
 from app.config import GMAIL_LOOKBACK_HOURS, GMAIL_MAX_RESULTS
+from app.gmail_client import LABEL_INBOX, LABEL_SPAM, LABEL_UNREAD
 from app.llm.base import LLMProvider
 from app.models import CategorizationHistory, Log, ProcessedEmail, database
 
@@ -78,18 +79,18 @@ def _process_email(
                 use_trash = False
 
                 if prompt.get("action_spam"):
-                    add_labels.append("SPAM")
-                    remove_labels.append("INBOX")
+                    add_labels.append(LABEL_SPAM)
+                    remove_labels.append(LABEL_INBOX)
                     actions_taken.append("sent to spam")
                 elif prompt.get("action_trash"):
                     use_trash = True
                     actions_taken.append("trashed")
                 elif prompt.get("action_archive"):
-                    remove_labels.append("INBOX")
+                    remove_labels.append(LABEL_INBOX)
                     actions_taken.append("archived")
 
                 if prompt.get("action_mark_read"):
-                    remove_labels.append("UNREAD")
+                    remove_labels.append(LABEL_UNREAD)
                     actions_taken.append("marked as read")
 
                 if use_trash:

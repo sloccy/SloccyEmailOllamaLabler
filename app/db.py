@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from peewee import fn
+from peewee import SQL, fn
 
 from app.config import LOG_RETENTION_DAYS, POLL_INTERVAL
 from app.models import (
@@ -15,6 +15,7 @@ from app.models import (
     ProcessedEmail,
     Prompt,
     Setting,
+    _now,
     database,
 )
 
@@ -73,9 +74,7 @@ def update_account_credentials(account_id, credentials_json):
 
 
 def update_last_scan(account_id):
-    Account.update(last_scan_at=datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")).where(
-        Account.id == account_id
-    ).execute()
+    Account.update(last_scan_at=_now()).where(Account.id == account_id).execute()
 
 
 def delete_account(account_id):
@@ -90,12 +89,11 @@ def delete_account(account_id):
 
 
 def _toggle_active(model, row_id):
-    obj = model.get_or_none(model.id == row_id)
-    if obj is None:
+    updated = model.update(active=SQL("1 - active")).where(model.id == row_id).execute()
+    if not updated:
         return None
-    new_active = 1 - obj.active
-    model.update(active=new_active).where(model.id == row_id).execute()
-    return new_active
+    obj = model.get_or_none(model.id == row_id)
+    return obj.active if obj else None
 
 
 def toggle_account(account_id):
@@ -208,6 +206,13 @@ def trim_processed_emails(lookback_hours):
         ProcessedEmail.processed_at.is_null(False),
         ProcessedEmail.processed_at < cutoff,
     ).execute()
+
+
+def trim_categorization_history():
+    retention_days = int(get_setting("log_retention_days", str(LOG_RETENTION_DAYS)))
+    if retention_days > 0:
+        cutoff = (datetime.now(UTC) - timedelta(days=retention_days)).strftime("%Y-%m-%d %H:%M:%S")
+        CategorizationHistory.delete().where(CategorizationHistory.timestamp < cutoff).execute()
 
 
 # ---- Logs ----

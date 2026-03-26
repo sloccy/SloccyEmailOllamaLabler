@@ -2,6 +2,7 @@ import base64
 import datetime
 import json
 import os
+import threading
 import time
 
 from bs4 import BeautifulSoup
@@ -24,7 +25,14 @@ SCOPES = [
 CREDENTIALS_FILE = os.getenv("CREDENTIALS_FILE", "/credentials/credentials.json")
 REDIRECT_URI = "http://localhost"
 
+# Gmail system label IDs
+LABEL_SPAM = "SPAM"
+LABEL_INBOX = "INBOX"
+LABEL_UNREAD = "UNREAD"
+LABEL_TRASH = "TRASH"
+
 _label_cache: TTLCache = TTLCache(maxsize=32, ttl=300)
+_label_cache_lock = threading.Lock()
 
 
 def _is_retryable(exc: BaseException) -> bool:
@@ -110,22 +118,29 @@ def build_label_cache(service, label_names: list) -> dict:
                     .execute()
                 )
                 cache[name] = created["id"]
-                _label_cache.pop(_cache_key(service), None)
+                with _label_cache_lock:
+                    _label_cache.pop(_cache_key(service), None)
             except Exception as e:
                 db.add_log("WARNING", f"Could not create label '{name}': {e}")
     return cache
 
 
-@_gmail_retry
-def list_recent_message_ids(service, max_results=GMAIL_MAX_RESULTS, lookback_hours=GMAIL_LOOKBACK_HOURS) -> list:
-    after_ts = int(time.time() - lookback_hours * 3600)
+def _paginate_message_ids(service, request) -> list:
     ids = []
-    request = service.users().messages().list(userId="me", maxResults=max_results, q=f"in:inbox after:{after_ts}")
     while request is not None:
         response = request.execute()
         ids.extend(m["id"] for m in response.get("messages", []))
         request = service.users().messages().list_next(request, response)
     return ids
+
+
+@_gmail_retry
+def list_recent_message_ids(service, max_results=GMAIL_MAX_RESULTS, lookback_hours=GMAIL_LOOKBACK_HOURS) -> list:
+    after_ts = int(time.time() - lookback_hours * 3600)
+    return _paginate_message_ids(
+        service,
+        service.users().messages().list(userId="me", maxResults=max_results, q=f"in:inbox after:{after_ts}"),
+    )
 
 
 @_gmail_retry
@@ -175,14 +190,16 @@ def fetch_message_details(service, message_ids: list) -> list:
 @_gmail_retry
 def list_labels(service) -> list:
     key = _cache_key(service)
-    if key in _label_cache:
-        return _label_cache[key]
+    with _label_cache_lock:
+        if key in _label_cache:
+            return _label_cache[key]
     result = service.users().labels().list(userId="me").execute()
     labels = sorted(
         [{"id": lbl["id"], "name": lbl["name"]} for lbl in result.get("labels", [])],
         key=lambda x: x["name"].lower(),
     )
-    _label_cache[key] = labels
+    with _label_cache_lock:
+        _label_cache[key] = labels
     return labels
 
 
@@ -194,13 +211,10 @@ def fetch_emails_older_than(service, days: int, label_name: str = None, excluded
     if excluded_labels:
         for lbl in excluded_labels:
             query += f" -label:{lbl}"
-    ids = []
-    request = service.users().messages().list(userId="me", q=query, maxResults=500)
-    while request is not None:
-        response = request.execute()
-        ids.extend(m["id"] for m in response.get("messages", []))
-        request = service.users().messages().list_next(request, response)
-    return ids
+    return _paginate_message_ids(
+        service,
+        service.users().messages().list(userId="me", q=query, maxResults=500),
+    )
 
 
 @_gmail_retry
