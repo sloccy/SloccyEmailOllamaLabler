@@ -17,7 +17,7 @@ from app.llm import get_provider as _get_llm_provider
 _llm = _get_llm_provider()
 
 app = Flask(__name__, template_folder="templates")
-app.secret_key = "placeholder-replaced-at-startup"
+app.secret_key = None
 Compress(app)
 
 _ASSET_VERSION = str(int(_time.time()))
@@ -57,8 +57,7 @@ def _fmt_date(ts):
     if not ts:
         return "—"
     try:
-        s = ts.replace("Z", "") if ts.endswith("Z") else ts
-        d = datetime.fromisoformat(s)
+        d = datetime.fromisoformat(ts)
         return f"{d.day} {d.strftime('%b')}, {d.strftime('%H:%M')}"
     except Exception:
         return str(ts)
