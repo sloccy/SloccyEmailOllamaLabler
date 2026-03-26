@@ -19,11 +19,9 @@
   --om-text: hsl(225, 12%, 82%);
   --om-text-60: hsla(225, 12%, 82%, 0.6);
   --om-text-50: hsla(225, 12%, 82%, 0.5);
-  --om-text-40: hsla(225, 12%, 82%, 0.4);
   --om-text-30: hsla(225, 12%, 82%, 0.3);
   --om-text-20: hsla(225, 12%, 82%, 0.2);
   --om-text-10: hsla(225, 12%, 82%, 0.1);
-  --om-text-08: hsla(225, 12%, 82%, 0.08);
   --om-success: hsl(152, 58%, 50%);
   --om-success-70: hsla(152, 58%, 50%, 0.7);
   --om-success-20: hsla(152, 58%, 50%, 0.2);
@@ -180,7 +178,6 @@ h1,h2,h3,h4,h5,h6 { letter-spacing: -0.025em; }
 .timeline li { display: grid; grid-template-columns: 20px 1fr; gap: 0 0.75rem; align-items: start; }
 .timeline-middle { display: flex; justify-content: center; padding-top: 0.3rem; }
 .timeline-end { padding: 0.125rem 0 0.5rem; min-width: 0; font-size: 0.75rem; }
-.timeline li hr { display: none; }
 .timeline-log-entry { transition: background 0.12s; border-radius: 4px; }
 .timeline-log-entry:hover { background: var(--hover-subtle-bg); }
 .tag-dot { width: 8px; height: 8px; padding: 0; min-width: 0; border-radius: 50%; display: inline-block; }

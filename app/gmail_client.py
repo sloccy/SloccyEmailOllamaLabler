@@ -2,17 +2,13 @@ import base64
 import datetime
 import json
 import os
-import threading
 import time
 
 from bs4 import BeautifulSoup
-from cachetools import TTLCache
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
-from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from app import db
 from app.config import EMAIL_BODY_TRUNCATION, GMAIL_LOOKBACK_HOURS, GMAIL_MAX_RESULTS
@@ -30,23 +26,6 @@ LABEL_SPAM = "SPAM"
 LABEL_INBOX = "INBOX"
 LABEL_UNREAD = "UNREAD"
 LABEL_TRASH = "TRASH"
-
-_label_cache: TTLCache = TTLCache(maxsize=32, ttl=300)
-_label_cache_lock = threading.Lock()
-
-
-def _is_retryable(exc: BaseException) -> bool:
-    if isinstance(exc, HttpError):
-        return exc.resp.status in (429, 500, 502, 503)
-    return isinstance(exc, (OSError, ConnectionError, TimeoutError))
-
-
-_gmail_retry = retry(
-    retry=retry_if_exception(_is_retryable),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=1, max=10),
-    reraise=True,
-)
 
 
 def get_auth_url(state: str) -> str:
@@ -74,32 +53,14 @@ def _get_email(creds: Credentials) -> str:
     return svc.userinfo().get().execute()["email"]
 
 
-def get_service(credentials_json: str):
-    """Load and refresh credentials. Returns (service, refreshed_json_or_None)."""
-    creds = Credentials.from_authorized_user_info(json.loads(credentials_json), SCOPES)
-    refreshed = None
+def get_service_and_refresh(account: dict):
+    creds = Credentials.from_authorized_user_info(json.loads(account["credentials_json"]), SCOPES)
     if not creds.valid:
         if not creds.refresh_token:
             raise ValueError("Credentials are invalid and no refresh token is available. Please reconnect the account.")
         creds.refresh(Request())
-        refreshed = creds.to_json()
-    if not creds.refresh_token:
-        raise ValueError("Credentials have no refresh token. Please reconnect the account.")
-    service = build("gmail", "v1", credentials=creds)
-    service._cache_key = creds.refresh_token
-    return service, refreshed
-
-
-def get_service_and_refresh(account: dict):
-    """Load/refresh credentials, persist if refreshed, return the Gmail service."""
-    service, refreshed = get_service(account["credentials_json"])
-    if refreshed is not None:
-        db.update_account_credentials(account["id"], refreshed)
-    return service
-
-
-def _cache_key(service) -> str:
-    return service._cache_key
+        db.update_account_credentials(account["id"], creds.to_json())
+    return build("gmail", "v1", credentials=creds)
 
 
 def build_label_cache(service, label_names: list) -> dict:
@@ -122,8 +83,6 @@ def build_label_cache(service, label_names: list) -> dict:
                     .execute()
                 )
                 cache[name] = created["id"]
-                with _label_cache_lock:
-                    _label_cache.pop(_cache_key(service), None)
             except Exception as e:
                 db.add_log("WARNING", f"Could not create label '{name}': {e}")
     return cache
@@ -138,18 +97,12 @@ def _paginate_message_ids(service, request) -> list:
     return ids
 
 
-@_gmail_retry
 def list_recent_message_ids(service, max_results=GMAIL_MAX_RESULTS, lookback_hours=GMAIL_LOOKBACK_HOURS) -> list:
     after_ts = int(time.time() - lookback_hours * 3600)
     return _paginate_message_ids(
         service,
         service.users().messages().list(userId="me", maxResults=max_results, q=f"in:inbox after:{after_ts}"),
     )
-
-
-@_gmail_retry
-def _execute_batch(batch) -> None:
-    batch.execute()
 
 
 def fetch_message_details(service, message_ids: list) -> list:
@@ -170,7 +123,7 @@ def fetch_message_details(service, message_ids: list) -> list:
                 service.users().messages().get(userId="me", id=msg_id, format="full"),
                 request_id=msg_id,
             )
-        _execute_batch(batch)
+        batch.execute()
 
     emails = []
     for msg_id in message_ids:
@@ -191,23 +144,14 @@ def fetch_message_details(service, message_ids: list) -> list:
     return emails
 
 
-@_gmail_retry
 def list_labels(service) -> list:
-    key = _cache_key(service)
-    with _label_cache_lock:
-        if key in _label_cache:
-            return _label_cache[key]
     result = service.users().labels().list(userId="me").execute()
-    labels = sorted(
+    return sorted(
         [{"id": lbl["id"], "name": lbl["name"]} for lbl in result.get("labels", [])],
         key=lambda x: x["name"].lower(),
     )
-    with _label_cache_lock:
-        _label_cache[key] = labels
-    return labels
 
 
-@_gmail_retry
 def fetch_emails_older_than(service, days: int, label_name: str = None, excluded_labels: list = None) -> list:
     cutoff = datetime.date.today() - datetime.timedelta(days=days)
     query = f"before:{cutoff.strftime('%Y/%m/%d')}"
@@ -222,7 +166,6 @@ def fetch_emails_older_than(service, days: int, label_name: str = None, excluded
     )
 
 
-@_gmail_retry
 def batch_modify_emails(service, modifications: list) -> None:
     """Apply label modifications using batchModify. Groups by identical add/remove combos."""
     if not modifications:
@@ -241,7 +184,6 @@ def batch_modify_emails(service, modifications: list) -> None:
             service.users().messages().batchModify(userId="me", body=body).execute()
 
 
-@_gmail_retry
 def batch_trash_emails(service, message_ids: list) -> int:
     if not message_ids:
         return 0

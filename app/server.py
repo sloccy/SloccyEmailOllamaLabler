@@ -8,14 +8,12 @@ from datetime import UTC, datetime
 from urllib.parse import parse_qs, urlparse
 
 from flask import Flask, Response, jsonify, make_response, render_template, request, session
-from flask_compress import Compress
 
 from app import db, gmail_client, llm, poller
 from app.config import HISTORY_MAX_LIMIT, MIN_POLL_INTERVAL, OLLAMA_HOST, OLLAMA_MODEL, POLL_INTERVAL
 
 app = Flask(__name__, template_folder="templates")
 app.secret_key = None
-Compress(app)
 
 _ASSET_VERSION = str(int(_time.time()))
 
@@ -23,19 +21,6 @@ _ASSET_VERSION = str(int(_time.time()))
 @app.context_processor
 def _inject_asset_version():
     return {"asset_v": _ASSET_VERSION}
-
-
-@app.before_request
-def _check_origin():
-    if request.method in ("GET", "HEAD", "OPTIONS"):
-        return
-    origin = request.headers.get("Origin", "")
-    if not origin:
-        referer = request.headers.get("Referer", "")
-        parsed = urlparse(referer)
-        origin = f"{parsed.scheme}://{parsed.netloc}" if referer else ""
-    if origin and urlparse(origin).netloc != request.host:
-        return _htmx_toast("Cross-origin request blocked.", status=403)
 
 
 # ---- Fragment helpers ----

@@ -6,8 +6,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from app import db
 from app.config import GMAIL_LOOKBACK_HOURS, POLL_INTERVAL
-from app.services.email_processor import process_account
-from app.services.retention import cleanup_retention
+from app.email_processor import process_account
+from app.retention import cleanup_retention
 
 _scheduler = BackgroundScheduler(daemon=True)
 _scan_lock = threading.Lock()
@@ -40,10 +40,6 @@ def start() -> None:
         next_run_time=datetime.now(UTC),
     )
     _scheduler.start()
-
-
-def stop() -> None:
-    _scheduler.shutdown(wait=False)
 
 
 def run_now() -> None:

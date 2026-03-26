@@ -1,3 +1,8 @@
+// ---- Panel toggle ----
+function togglePanel(id) {
+  document.getElementById(id).classList.toggle('d-none');
+}
+
 // ---- Sync account selects ----
 function syncAccountSelects() {
   const src = document.getElementById('prompt-filter-account');
@@ -32,6 +37,12 @@ function _navToHash() {
 
 window.addEventListener('DOMContentLoaded', _navToHash);
 window.addEventListener('hashchange', _navToHash);
+
+let _oauthStep2Initial = null;
+window.addEventListener('DOMContentLoaded', function() {
+  const el = document.getElementById('oauth-step-2-body');
+  if (el) _oauthStep2Initial = el.innerHTML;
+});
 
 // ---- Export prompts ----
 function exportPrompts() {
@@ -220,10 +231,7 @@ document.body.addEventListener('showToast', function(e) {
 
 document.body.addEventListener('closeOAuthPanel', function() {
   document.getElementById('add-account-panel').classList.add('d-none');
-  document.getElementById('oauth-step-2-body').innerHTML =
-    '<div class="flex-grow-1">' +
-    '<div class="fw-medium mb-2">Open the link and approve access</div>' +
-    '<div class="small text-muted mb-2">Click "Generate Link" first.</div>' +
-    '</div>';
+  const step2 = document.getElementById('oauth-step-2-body');
+  if (_oauthStep2Initial !== null) step2.innerHTML = _oauthStep2Initial;
   document.getElementById('oauth-step-1').classList.remove('done');
 });

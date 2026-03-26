@@ -2,7 +2,6 @@ import json
 import re
 
 import ollama as _ollama
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app import db
 from app.config import (
@@ -15,17 +14,6 @@ from app.config import (
 )
 
 _client = _ollama.Client(host=OLLAMA_HOST, timeout=OLLAMA_TIMEOUT)
-
-
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=30), reraise=True)
-def _chat_classify(messages: list, options: dict):
-    return _client.chat(
-        model=OLLAMA_MODEL,
-        messages=messages,
-        think=False,
-        format="json",
-        options=options,
-    )
 
 
 def ensure_model_pulled() -> None:
@@ -62,7 +50,8 @@ Example: {{{example}}}
 No explanation, no markdown, just the JSON object."""
 
     try:
-        response = _chat_classify(
+        response = _client.chat(
+            model=OLLAMA_MODEL,
             messages=[
                 {
                     "role": "system",
@@ -70,6 +59,8 @@ No explanation, no markdown, just the JSON object."""
                 },
                 {"role": "user", "content": prompt},
             ],
+            think=False,
+            format="json",
             options={
                 "temperature": 0,
                 "num_predict": max(50, len(prompts) * 20),
@@ -94,34 +85,6 @@ No explanation, no markdown, just the JSON object."""
     except Exception as e:
         db.add_log("ERROR", f"LLM request failed: {e!r}")
         return {p["id"]: False for p in prompts}
-
-
-def _build_messages(description: str) -> list:
-    return [
-        {
-            "role": "system",
-            "content": (
-                "You write email filter rules for an AI classifier. "
-                "The classifier reads email content and infers meaning, intent, and context — "
-                "it is NOT limited to keywords or sender addresses. "
-                "Rules should describe what an email is about, its purpose, and tone. "
-                "Be specific about what should match and what should not.\n"
-                "Output only the rule text. No preamble, no quotes, no explanation."
-            ),
-        },
-        {
-            "role": "user",
-            "content": (
-                f'A user wants to automatically label certain emails. They described:\n\n"{description}"\n\n'
-                "Write a precise classifier instruction (2-5 sentences). "
-                "Focus on the meaning and context of the email — what it is about, why it was sent, "
-                "and who it is intended for. Describe what distinguishes matching emails from "
-                "similar-but-different ones based on content and intent, not just surface signals "
-                "like sender address or keywords.\n\n"
-                "Respond with ONLY the instruction text."
-            ),
-        },
-    ]
 
 
 def _filter_think_chunks(buffer: str, in_think: bool, chunk: str):
@@ -152,7 +115,31 @@ def stream_generate_prompt_instruction(description: str):
     buffer = ""
     for chunk in _client.chat(
         model=OLLAMA_MODEL,
-        messages=_build_messages(description),
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You write email filter rules for an AI classifier. "
+                    "The classifier reads email content and infers meaning, intent, and context — "
+                    "it is NOT limited to keywords or sender addresses. "
+                    "Rules should describe what an email is about, its purpose, and tone. "
+                    "Be specific about what should match and what should not.\n"
+                    "Output only the rule text. No preamble, no quotes, no explanation."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f'A user wants to automatically label certain emails. They described:\n\n"{description}"\n\n'
+                    "Write a precise classifier instruction (2-5 sentences). "
+                    "Focus on the meaning and context of the email — what it is about, why it was sent, "
+                    "and who it is intended for. Describe what distinguishes matching emails from "
+                    "similar-but-different ones based on content and intent, not just surface signals "
+                    "like sender address or keywords.\n\n"
+                    "Respond with ONLY the instruction text."
+                ),
+            },
+        ],
         stream=True,
         options={
             "temperature": 0.7,
