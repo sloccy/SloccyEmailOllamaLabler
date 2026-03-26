@@ -429,7 +429,9 @@ def frag_delete_account(account_id):
 @app.route("/fragments/prompts")
 def frag_prompts():
     account_id = request.args.get("account_id", "")
-    return fragment_response("fragments/prompts_list.html", _prompt_list_context(int(account_id) if account_id else None))
+    return fragment_response(
+        "fragments/prompts_list.html", _prompt_list_context(int(account_id) if account_id else None)
+    )
 
 
 @app.route("/fragments/prompts", methods=["POST"])
@@ -477,7 +479,9 @@ def frag_toggle_prompt(prompt_id):
     if new_active is None:
         return _htmx_toast("Not found.", status=404)
     msg = "Rule paused." if not new_active else "Rule resumed."
-    return fragment_response("fragments/prompt_card_view.html", _prompt_card_context(db.get_prompt(prompt_id)), toast=msg)
+    return fragment_response(
+        "fragments/prompt_card_view.html", _prompt_card_context(db.get_prompt(prompt_id)), toast=msg
+    )
 
 
 @app.route("/fragments/prompts/<int:prompt_id>/edit")

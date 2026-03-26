@@ -5,7 +5,6 @@ import os
 import time
 
 from bs4 import BeautifulSoup
-
 from cachetools import TTLCache
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
