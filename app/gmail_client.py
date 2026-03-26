@@ -98,17 +98,20 @@ def build_label_cache(service, label_names: list) -> dict:
         if name.lower() in existing:
             cache[name] = existing[name.lower()]
         else:
-            created = (
-                service.users()
-                .labels()
-                .create(
-                    userId="me",
-                    body={"name": name, "labelListVisibility": "labelShow", "messageListVisibility": "show"},
+            try:
+                created = (
+                    service.users()
+                    .labels()
+                    .create(
+                        userId="me",
+                        body={"name": name, "labelListVisibility": "labelShow", "messageListVisibility": "show"},
+                    )
+                    .execute()
                 )
-                .execute()
-            )
-            cache[name] = created["id"]
-            _label_cache.pop(_cache_key(service), None)
+                cache[name] = created["id"]
+                _label_cache.pop(_cache_key(service), None)
+            except Exception as e:
+                db.add_log("WARNING", f"Could not create label '{name}': {e}")
     return cache
 
 

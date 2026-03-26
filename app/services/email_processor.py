@@ -65,7 +65,14 @@ def _process_email(
             should_label = email_results.get(prompt["id"], False)
 
             if should_label:
-                add_labels = [label_cache[prompt["label_name"]]]
+                label_id = label_cache.get(prompt["label_name"])
+                if label_id is None:
+                    db.add_log(
+                        "WARNING",
+                        f"[{email_addr}] Label '{prompt['label_name']}' missing from cache, skipping rule '{prompt['name']}'",
+                    )
+                    continue
+                add_labels = [label_id]
                 remove_labels = []
                 actions_taken = [f"labeled → {prompt['label_name']}"]
                 use_trash = False
