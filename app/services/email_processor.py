@@ -1,11 +1,10 @@
-from app import db, gmail_client
+from app import db, gmail_client, llm
 from app.config import GMAIL_LOOKBACK_HOURS, GMAIL_MAX_RESULTS
 from app.gmail_client import LABEL_INBOX, LABEL_SPAM, LABEL_UNREAD
-from app.llm.base import LLMProvider
 from app.models import CategorizationHistory, Log, ProcessedEmail, database
 
 
-def process_account(account: dict, prompts: list, provider: LLMProvider):
+def process_account(account: dict, prompts: list):
     """Fetch new emails for an account, classify them, and apply labels/actions.
     Always returns credentials so the caller can run retention cleanup."""
     account_id = account["id"]
@@ -33,7 +32,7 @@ def process_account(account: dict, prompts: list, provider: LLMProvider):
     all_trashes = []
 
     for email in new_emails:
-        modifies, trashes = _process_email(email, account_id, email_addr, prompts, label_cache, provider)
+        modifies, trashes = _process_email(email, account_id, email_addr, prompts, label_cache)
         all_modifies.extend(modifies)
         all_trashes.extend(trashes)
 
@@ -47,13 +46,13 @@ def process_account(account: dict, prompts: list, provider: LLMProvider):
 
 
 def _process_email(
-    email: dict, account_id: int, email_addr: str, prompts: list, label_cache: dict, provider: LLMProvider
+    email: dict, account_id: int, email_addr: str, prompts: list, label_cache: dict
 ) -> tuple:
     """Classify an email and write DB records. Returns (modifies, trashes) for batched Gmail calls."""
     modifies = []
     trashes = []
     try:
-        email_results = provider.classify_email_batch(email, prompts)
+        email_results = llm.classify_email_batch(email, prompts)
         stop = False
 
         # Collect DB writes; apply all in one transaction.

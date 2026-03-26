@@ -1,15 +1,16 @@
-import datetime
+import threading
 import time
+from datetime import UTC, datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from app import db
 from app.config import GMAIL_LOOKBACK_HOURS, POLL_INTERVAL
-from app.llm import get_provider
 from app.services.email_processor import process_account
 from app.services.retention import cleanup_retention
 
 _scheduler = BackgroundScheduler(daemon=True)
+_scan_lock = threading.Lock()
 _last_run: float | None = None
 _last_cleanup = 0.0
 _CLEANUP_INTERVAL = 3600
@@ -36,7 +37,7 @@ def start() -> None:
         id="poll",
         max_instances=1,
         replace_existing=True,
-        next_run_time=datetime.datetime.now(datetime.UTC),
+        next_run_time=datetime.now(UTC),
     )
     _scheduler.start()
 
@@ -46,7 +47,8 @@ def stop() -> None:
 
 
 def run_now() -> None:
-    _scheduler.add_job(_run_scan, id="manual_scan", max_instances=1, replace_existing=True)
+    if not _scan_lock.locked():
+        _scheduler.add_job(_run_scan, id="poll", replace_existing=True)
 
 
 def update_interval(seconds: int) -> None:
@@ -55,32 +57,36 @@ def update_interval(seconds: int) -> None:
 
 
 def _run_scan() -> None:
-    global _last_run, _last_cleanup
-    _last_run = time.time()
-    now = _last_run
-    if now - _last_cleanup >= _CLEANUP_INTERVAL:
-        db.trim_logs()
-        db.trim_processed_emails(GMAIL_LOOKBACK_HOURS)
-        db.trim_categorization_history()
-        _last_cleanup = now
-
-    accounts = [a for a in db.list_accounts() if a["active"]]
-    if not accounts:
-        db.add_log("INFO", "Poller ran: no active accounts configured.")
+    if not _scan_lock.acquire(blocking=False):
         return
+    try:
+        global _last_run, _last_cleanup
+        _last_run = time.time()
+        now = _last_run
+        if now - _last_cleanup >= _CLEANUP_INTERVAL:
+            db.trim_logs()
+            db.trim_processed_emails(GMAIL_LOOKBACK_HOURS)
+            db.trim_categorization_history()
+            _last_cleanup = now
 
-    provider = get_provider()
-    all_prompts = db.list_prompts()
-    for account in accounts:
-        prompts = [
-            p for p in all_prompts if p["active"] and (p["account_id"] is None or p["account_id"] == account["id"])
-        ]
-        if not prompts:
-            db.add_log("INFO", f"[{account['email']}] No active prompts for this account.")
-            continue
-        db.add_log("INFO", f"Starting scan: [{account['email']}] with {len(prompts)} prompt(s).")
-        try:
-            service = process_account(account, prompts, provider)
-            cleanup_retention(account, service)
-        except Exception as e:
-            db.add_log("ERROR", f"[{account['email']}] Scan failed: {e}")
+        accounts = [a for a in db.list_accounts() if a["active"]]
+        if not accounts:
+            db.add_log("INFO", "Poller ran: no active accounts configured.")
+            return
+
+        all_prompts = db.list_prompts()
+        for account in accounts:
+            prompts = [
+                p for p in all_prompts if p["active"] and (p["account_id"] is None or p["account_id"] == account["id"])
+            ]
+            if not prompts:
+                db.add_log("INFO", f"[{account['email']}] No active prompts for this account.")
+                continue
+            db.add_log("INFO", f"Starting scan: [{account['email']}] with {len(prompts)} prompt(s).")
+            try:
+                service = process_account(account, prompts)
+                cleanup_retention(account, service)
+            except Exception as e:
+                db.add_log("ERROR", f"[{account['email']}] Scan failed: {e}")
+    finally:
+        _scan_lock.release()

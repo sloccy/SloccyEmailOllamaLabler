@@ -10,11 +10,8 @@ from urllib.parse import parse_qs, urlparse
 from flask import Flask, Response, jsonify, make_response, render_template, request, session
 from flask_compress import Compress
 
-from app import db, gmail_client, poller
+from app import db, gmail_client, llm, poller
 from app.config import HISTORY_MAX_LIMIT, MIN_POLL_INTERVAL, OLLAMA_HOST, OLLAMA_MODEL, POLL_INTERVAL
-from app.llm import get_provider as _get_llm_provider
-
-_llm = _get_llm_provider()
 
 app = Flask(__name__, template_folder="templates")
 app.secret_key = None
@@ -797,7 +794,7 @@ def api_generate_prompt_stream():
             yield "event: done\ndata: \n\n"
             return
         try:
-            for event in _llm.stream_generate_prompt_instruction(description):
+            for event in llm.stream_generate_prompt_instruction(description):
                 event_type = event.get("type", "content")
                 text = event.get("text", "")
                 lines = ["event: " + event_type] + [f"data: {line}" for line in text.split("\n")] + ["", ""]
@@ -826,7 +823,7 @@ def _get_or_create_secret_key() -> str:
 def create_app():
     db.init_db()
     app.secret_key = _get_or_create_secret_key()
-    threading.Thread(target=_llm.ensure_model_pulled, daemon=True).start()
+    threading.Thread(target=llm.ensure_model_pulled, daemon=True).start()
     poller.start()
     return app
 
