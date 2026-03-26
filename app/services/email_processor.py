@@ -1,7 +1,7 @@
 from app import db, gmail_client
 from app.config import GMAIL_LOOKBACK_HOURS, GMAIL_MAX_RESULTS
-from app.db import get_db
 from app.llm.base import LLMProvider
+from app.models import CategorizationHistory, Log, ProcessedEmail, database
 
 
 def process_account(account: dict, prompts: list, provider: LLMProvider):
@@ -114,31 +114,11 @@ def _process_email(
                     }
                 )
 
-        with get_db() as conn:
-            for level, message in pending_logs:
-                conn.execute("INSERT INTO logs (level, message) VALUES (?, ?)", (level, message))
-            for c in pending_cats:
-                conn.execute(
-                    """INSERT INTO categorization_history
-                       (account_id, account_email, message_id, subject, sender,
-                        prompt_id, prompt_name, label_name, actions)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (
-                        c["account_id"],
-                        c["account_email"],
-                        c["message_id"],
-                        c["subject"],
-                        c["sender"],
-                        c["prompt_id"],
-                        c["prompt_name"],
-                        c["label_name"],
-                        c["actions"],
-                    ),
-                )
-            conn.execute(
-                "INSERT OR IGNORE INTO processed_emails (account_id, message_id) VALUES (?, ?)",
-                (account_id, email["id"]),
-            )
+        with database.atomic():
+            Log.insert_many([{"level": lvl, "message": msg} for lvl, msg in pending_logs]).execute()
+            if pending_cats:
+                CategorizationHistory.insert_many(pending_cats).execute()
+            ProcessedEmail.insert(account_id=account_id, message_id=email["id"]).on_conflict_ignore().execute()
     except Exception as e:
         db.add_log("ERROR", f"[{email_addr}] Error processing email '{email.get('subject', '?')[:60]}': {e}")
         db.mark_processed(account_id, email["id"])  # prevent infinite retry on persistent failures

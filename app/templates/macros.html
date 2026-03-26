@@ -1,3 +1,5 @@
+{% macro page_header(title, subtitle) %}<div class="d-flex align-items-center justify-content-between mb-4 pb-3 border-bottom"><div><h2 class="fw-bold mb-1">{{ title }}</h2><div class="small text-muted">{{ subtitle }}</div></div>{% if caller %}<div>{{ caller() }}</div>{% endif %}</div>{% endmacro %}
+
 {% macro action_checkboxes(prefix, p={}) %}
 <div class="d-flex flex-wrap gap-2 mt-1">
   <div class="d-flex align-items-center gap-2 bg-base-300 border rounded-2 px-3 py-2"><input type="checkbox" class="form-check-input mt-0" name="action_archive" value="1" id="{{ prefix }}-archive" {% if p.get('action_archive') %}checked{% endif %}><label class="mb-0" for="{{ prefix }}-archive">Archive</label></div>

@@ -220,9 +220,7 @@ def api_export_config():
             }
         )
 
-    with db.get_db_readonly() as conn:
-        settings_rows = conn.execute("SELECT key, value FROM settings").fetchall()
-    settings_export = {r["key"]: r["value"] for r in settings_rows if r["key"] != "flask_secret_key"}
+    settings_export = {r["key"]: r["value"] for r in db.get_all_settings() if r["key"] != "flask_secret_key"}
 
     retention_export = []
     for a in accounts_raw:
