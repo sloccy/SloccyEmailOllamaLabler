@@ -20,8 +20,21 @@ function setActivePage(page, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('[data-page]').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
-  el.classList.add('active');
+  if (el) el.classList.add('active');
+  if (location.hash !== '#' + page) history.replaceState(null, '', '#' + page);
 }
+
+window.addEventListener('DOMContentLoaded', () => {
+  const page = location.hash.replace('#', '') || 'dashboard';
+  const nav = document.querySelector(`[data-page="${page}"]`);
+  if (nav) setActivePage(page, nav);
+});
+
+window.addEventListener('hashchange', () => {
+  const page = location.hash.replace('#', '') || 'dashboard';
+  const nav = document.querySelector(`[data-page="${page}"]`);
+  if (nav) setActivePage(page, nav);
+});
 
 // ---- Export prompts ----
 function exportPrompts() {
@@ -79,10 +92,19 @@ function generatePrompt() {
   const container = document.getElementById('builder-sse-container');
   container.setAttribute('sse-connect', '/api/prompts/generate-stream?description=' + encodeURIComponent(desc));
   htmx.process(container);
+  container._genTimeout = setTimeout(() => {
+    const b = document.getElementById('btn-generate');
+    if (b.disabled) {
+      b.disabled = false; b.textContent = '◆ Generate Instruction'; b.classList.remove('btn-generating');
+      document.getElementById('btn-use-prompt').disabled = false;
+      toast('Generation timed out. Try again.', 'error');
+    }
+  }, 120000);
 }
 
 document.body.addEventListener('htmx:sseClose', function(e) {
   if (e.detail && e.detail.elt && e.detail.elt.id === 'builder-sse-container') {
+    clearTimeout(e.detail.elt._genTimeout);
     const btn = document.getElementById('btn-generate');
     btn.disabled = false; btn.textContent = '◆ Generate Instruction'; btn.classList.remove('btn-generating');
     document.getElementById('btn-use-prompt').disabled = false;
@@ -150,19 +172,23 @@ function handleConfigImport(input) {
         return;
       }
       const s = data.summary;
-      el.innerHTML = '<div class="small text-muted">Import complete — ' +
-        'accounts: +' + s.accounts.added + ' (' + s.accounts.skipped + ' skipped), ' +
-        'prompts: +' + s.prompts.added + ' (' + s.prompts.skipped + ' skipped), ' +
-        'settings: +' + s.settings.added + ' (' + s.settings.skipped + ' skipped), ' +
-        'retention: +' + s.retention.added + ' (' + s.retention.skipped + ' skipped).' +
-        '</div>';
+      const ok = document.createElement('div');
+      ok.className = 'small text-muted';
+      ok.textContent = `Import complete — accounts: +${s.accounts.added} (${s.accounts.skipped} skipped), ` +
+        `prompts: +${s.prompts.added} (${s.prompts.skipped} skipped), ` +
+        `settings: +${s.settings.added} (${s.settings.skipped} skipped), ` +
+        `retention: +${s.retention.added} (${s.retention.skipped} skipped).`;
+      el.replaceChildren(ok);
       if (window.htmx) htmx.trigger(document.body, 'showToast',
         { message: 'Configuration imported.', type: 'success' });
     })
     .catch(() => {
       const el = document.getElementById('import-result');
       el.style.display = '';
-      el.innerHTML = '<div class="small text-danger">Import failed. Check the file and try again.</div>';
+      const fail = document.createElement('div');
+      fail.className = 'small text-danger';
+      fail.textContent = 'Import failed. Check the file and try again.';
+      el.replaceChildren(fail);
     });
 }
 
@@ -184,7 +210,11 @@ document.body.addEventListener('showToast', function(e) {
 
 document.body.addEventListener('closeOAuthPanel', function() {
   document.getElementById('add-account-panel').classList.add('d-none');
-  document.getElementById('oauth-step-2-body').innerHTML =
-    '<div class="flex-grow-1"><div class="fw-medium mb-2">Open the link and approve access</div><div class="small text-muted mb-2">Click "Generate Link" first.</div></div>';
+  const step2 = document.getElementById('oauth-step-2-body');
+  const title = document.createElement('div'); title.className = 'fw-medium mb-2'; title.textContent = 'Open the link and approve access';
+  const hint = document.createElement('div'); hint.className = 'small text-muted mb-2'; hint.textContent = 'Click "Generate Link" first.';
+  const wrap = document.createElement('div'); wrap.className = 'flex-grow-1';
+  wrap.append(title, hint);
+  step2.replaceChildren(wrap);
   document.getElementById('oauth-step-1').classList.remove('done');
 });

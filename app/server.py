@@ -579,6 +579,24 @@ def frag_history_filters():
     return fragment_response("fragments/history_filters.html", {"accounts": accounts, "prompts": prompts})
 
 
+_gmail_label_cache: dict[int, tuple[float, list]] = {}
+_GMAIL_LABEL_CACHE_TTL = 60
+
+
+def _get_gmail_labels(account_id, account):
+    now = _time.monotonic()
+    cached = _gmail_label_cache.get(account_id)
+    if cached and now - cached[0] < _GMAIL_LABEL_CACHE_TTL:
+        return cached[1]
+    try:
+        service = gmail_client.get_service_and_refresh(account)
+        labels = gmail_client.list_labels(service)
+    except Exception:
+        labels = []
+    _gmail_label_cache[account_id] = (now, labels)
+    return labels
+
+
 def _retention_panel(account_id, account=None, service=None, toast=None):
     if account is None:
         account = db.get_account(account_id)
@@ -590,12 +608,7 @@ def _retention_panel(account_id, account=None, service=None, toast=None):
             toast=toast,
         )
     retention = db.get_retention(account_id)
-    try:
-        if service is None:
-            service = gmail_client.get_service_and_refresh(account)
-        gmail_labels = gmail_client.list_labels(service)
-    except Exception:
-        gmail_labels = []
+    gmail_labels = _get_gmail_labels(account_id, account)
     return fragment_response(
         "fragments/retention_panel.html",
         {"retention": retention, "account_id": account_id, "gmail_labels": gmail_labels},

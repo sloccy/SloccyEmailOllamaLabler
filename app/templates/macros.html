@@ -9,6 +9,8 @@
 </div>
 {% endmacro %}
 
+{% macro empty_state(message) %}<div class="empty"><div class="empty-icon">{{ caller() }}</div>{{ message }}</div>{% endmacro %}
+
 {% macro step_badge(n) %}
 <div class="badge border border-primary text-primary font-monospace flex-shrink-0 step-badge">{{ n }}</div>
 {% endmacro %}

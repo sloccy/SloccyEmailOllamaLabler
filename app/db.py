@@ -80,8 +80,13 @@ def update_last_scan(account_id):
 
 def delete_account(account_id):
     with database.atomic():
-        Account.delete_by_id(account_id)
+        Prompt.delete().where(Prompt.account_id == account_id).execute()
+        CategorizationHistory.delete().where(CategorizationHistory.account_id == account_id).execute()
+        AccountRetention.delete().where(AccountRetention.account_id == account_id).execute()
+        LabelRetention.delete().where(LabelRetention.account_id == account_id).execute()
+        LabelExemption.delete().where(LabelExemption.account_id == account_id).execute()
         ProcessedEmail.delete().where(ProcessedEmail.account_id == account_id).execute()
+        Account.delete_by_id(account_id)
 
 
 def _toggle_active(model, row_id):

@@ -1,3 +1,4 @@
+{% from "macros.html" import empty_state %}
 {% if logs %}
 <ul class="timeline">
   {% for l in logs %}
@@ -14,8 +15,5 @@
   {% endfor %}
 </ul>
 {% else %}
-<div class="empty">
-  <div class="empty-icon"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 8h20M6 14h20M6 20h14" stroke-linecap="round"/></svg></div>
-  No logs yet.
-</div>
+{% call empty_state('No logs yet.') %}<svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 8h20M6 14h20M6 20h14" stroke-linecap="round"/></svg>{% endcall %}
 {% endif %}
