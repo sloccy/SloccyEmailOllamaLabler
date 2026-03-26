@@ -1,5 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
+from peewee import fn
+
 from app.config import LOG_RETENTION_DAYS, POLL_INTERVAL
 from app.models import (
     ALL_MODELS,
@@ -14,7 +16,6 @@ from app.models import (
     Prompt,
     Setting,
     database,
-    fn,
 )
 
 
