@@ -24,17 +24,14 @@ function setActivePage(page, el) {
   if (location.hash !== '#' + page) history.replaceState(null, '', '#' + page);
 }
 
-window.addEventListener('DOMContentLoaded', () => {
+function _navToHash() {
   const page = location.hash.replace('#', '') || 'dashboard';
   const nav = document.querySelector(`[data-page="${page}"]`);
   if (nav) setActivePage(page, nav);
-});
+}
 
-window.addEventListener('hashchange', () => {
-  const page = location.hash.replace('#', '') || 'dashboard';
-  const nav = document.querySelector(`[data-page="${page}"]`);
-  if (nav) setActivePage(page, nav);
-});
+window.addEventListener('DOMContentLoaded', _navToHash);
+window.addEventListener('hashchange', _navToHash);
 
 // ---- Export prompts ----
 function exportPrompts() {
