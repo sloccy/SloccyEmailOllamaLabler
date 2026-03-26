@@ -141,7 +141,7 @@ def _filter_think_chunks(buffer: str, in_think: bool, chunk: str):
         else:
             if idx > 0:
                 events.append(("think" if in_think else "content", buffer[:idx]))
-            buffer = buffer[idx + len(tag):]
+            buffer = buffer[idx + len(tag) :]
             in_think = not in_think
     return events, buffer, in_think
 

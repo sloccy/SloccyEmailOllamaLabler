@@ -45,9 +45,7 @@ def process_account(account: dict, prompts: list):
     return service
 
 
-def _process_email(
-    email: dict, account_id: int, email_addr: str, prompts: list, label_cache: dict
-) -> tuple:
+def _process_email(email: dict, account_id: int, email_addr: str, prompts: list, label_cache: dict) -> tuple:
     """Classify an email and write DB records. Returns (modifies, trashes) for batched Gmail calls."""
     modifies = []
     trashes = []
