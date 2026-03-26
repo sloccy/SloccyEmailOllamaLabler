@@ -1,0 +1,3 @@
+{{ first_option|safe }}
+{% for a in accounts %}<option value="{{ a.id }}">{{ a.email }}</option>
+{% endfor %}

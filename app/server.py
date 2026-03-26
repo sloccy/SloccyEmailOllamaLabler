@@ -1,5 +1,4 @@
 import csv
-import html as _html
 import io
 import json
 import secrets
@@ -725,15 +724,13 @@ def frag_scan():
 @app.route("/fragments/account-options")
 def frag_account_options():
     opt_type = request.args.get("type", "filter")
+    first_options = {
+        "new-prompt": '<option value="">All accounts (global)</option>',
+        "retention": '<option value="">Select an account\u2026</option>',
+    }
+    first_option = first_options.get(opt_type, '<option value="">All accounts</option>')
     accounts = _safe_accounts()
-    if opt_type == "new-prompt":
-        first = '<option value="">All accounts (global)</option>'
-    elif opt_type == "retention":
-        first = '<option value="">Select an account\u2026</option>'
-    else:
-        first = '<option value="">All accounts</option>'
-    options = first + "".join(f'<option value="{a["id"]}">{_html.escape(a["email"])}</option>' for a in accounts)
-    return Response(options, content_type="text/html")
+    return render_template("fragments/account_options.html", first_option=first_option, accounts=accounts)
 
 
 @app.route("/fragments/retention-query")
