@@ -154,8 +154,12 @@ def stream_generate_prompt_instruction(description: str):
         },
     ):
         token = chunk.message.content
-        if not token:
+        thinking = getattr(chunk.message, "thinking", None)
+        if not token and not thinking:
             continue
+        if thinking and not token:
+            _logger.info("Ollama thinking token (content empty): %r", thinking[:80])
+            token = thinking
         if not in_think and not buffer:
             _logger.info("First token received from Ollama: %r", token[:50])
         events, buffer, in_think = _filter_think_chunks(buffer, in_think, token)
