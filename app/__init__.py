@@ -9,4 +9,4 @@ changes, prefer the library over hand-rolling the equivalent logic.
 
 import logging
 
-logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.DEBUG)
+logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)

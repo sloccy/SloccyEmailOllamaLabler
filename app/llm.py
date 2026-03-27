@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 
 import ollama as _ollama
@@ -13,6 +14,7 @@ from app.config import (
     OLLAMA_TIMEOUT,
 )
 
+_logger = logging.getLogger("ollamail.llm")
 _client = _ollama.Client(host=OLLAMA_HOST, timeout=OLLAMA_TIMEOUT)
 
 
@@ -154,9 +156,13 @@ def stream_generate_prompt_instruction(description: str):
         token = chunk.message.content
         if not token:
             continue
+        if not in_think and not buffer:
+            _logger.info("First token received from Ollama: %r", token[:50])
         events, buffer, in_think = _filter_think_chunks(buffer, in_think, token)
         for evt_type, evt_text in events:
             if evt_text:
+                _logger.debug("Yielding SSE event: type=%s len=%d", evt_type, len(evt_text))
                 yield {"type": evt_type, "text": evt_text}
     if buffer:
         yield {"type": "think" if in_think else "content", "text": buffer}
+    _logger.info("stream_generate_prompt_instruction finished")

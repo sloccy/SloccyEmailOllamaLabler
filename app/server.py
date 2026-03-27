@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+import logging
 import secrets
 import threading
 import time as _time
@@ -11,6 +12,8 @@ from flask import Flask, Response, jsonify, make_response, render_template, requ
 
 from app import db, gmail_client, llm, poller
 from app.config import HISTORY_MAX_LIMIT, MIN_POLL_INTERVAL, OLLAMA_HOST, OLLAMA_MODEL, POLL_INTERVAL
+
+_logger = logging.getLogger("ollamail.server")
 
 app = Flask(__name__, template_folder="templates")
 app.secret_key = None
@@ -780,12 +783,17 @@ def api_generate_prompt_stream():
             return
         try:
             db.add_log("INFO", f"Prompt generation starting for: {description[:80]}")
+            event_count = 0
             for event in llm.stream_generate_prompt_instruction(description):
                 event_type = event.get("type", "content")
                 text = event.get("text", "")
                 lines = ["event: " + event_type] + [f"data: {line}" for line in text.split("\n")] + ["", ""]
-                yield "\n".join(lines)
-            db.add_log("INFO", "Prompt generation completed.")
+                chunk = "\n".join(lines)
+                event_count += 1
+                if event_count <= 3:
+                    _logger.info("SSE chunk #%d: type=%s len=%d", event_count, event_type, len(text))
+                yield chunk
+            db.add_log("INFO", f"Prompt generation completed. Sent {event_count} SSE events.")
             yield "event: done\ndata: \n\n"
         except Exception as e:
             db.add_log("ERROR", f"Prompt generation failed: {e}")
