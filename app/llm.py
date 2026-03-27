@@ -37,9 +37,10 @@ def ensure_model_pulled() -> None:
         db.add_log("WARNING", f"Could not check/pull Ollama model: {e}")
 
 
-def classify_email_batch(email: dict, prompts: list) -> dict:
+def classify_email_batch(email: dict, prompts: list) -> tuple:
+    """Returns (parsed_results: dict[int, bool], raw_response: str)."""
     if not prompts:
-        return {}
+        return {}, ""
 
     rules_text = "\n".join(f"{i + 1}. {p['name']}: {p['instructions']}" for i, p in enumerate(prompts))
     example = ", ".join(f'"{i + 1}": false' for i in range(min(2, len(prompts))))
@@ -88,6 +89,7 @@ No explanation, no markdown, just the JSON object."""
         if not raw.strip() and thinking.strip():
             db.add_log("WARNING", "LLM returned empty content with think=False — falling back to thinking field")
             raw = thinking
+        raw_response = raw  # save original for history before stripping
         raw = _THINK_RE.sub("", raw).strip()
         raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw).strip()
         result = json.loads(raw)
@@ -99,7 +101,7 @@ No explanation, no markdown, just the JSON object."""
         if DEBUG_LOGGING:
             db.add_log("DEBUG", f"LLM raw response: {raw}")
             db.add_log("DEBUG", f"LLM parsed: { {p['name']: parsed.get(p['id'], False) for p in prompts} }")
-        return parsed
+        return parsed, raw_response
     except json.JSONDecodeError as e:
         db.add_log("ERROR", f"LLM parse error: {e!r} | raw: {raw!r}")
         raise LLMError(f"LLM parse error: {e!r}") from e

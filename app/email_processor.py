@@ -55,7 +55,7 @@ def _process_email(email: dict, account_id: int, email_addr: str, prompts: list,
             "INFO",
             f"[{email_addr}] Classifying: '{email.get('subject', '?')[:60]}' from {email.get('sender', '?')[:60]}",
         )
-        email_results = llm.classify_email_batch(email, prompts)
+        email_results, raw_llm_response = llm.classify_email_batch(email, prompts)
         matched = [p["name"] for p in prompts if email_results.get(p["id"])]
         db.add_log("INFO", f"[{email_addr}] Classification done: {len(matched)} match(es): {matched or 'none'}")
         stop = False
@@ -123,13 +123,29 @@ def _process_email(email: dict, account_id: int, email_addr: str, prompts: list,
                         "prompt_name": prompt["name"],
                         "label_name": prompt["label_name"],
                         "actions": ", ".join(actions_taken),
+                        "llm_response": raw_llm_response,
                     }
                 )
 
+        if not pending_cats:
+            pending_cats.append(
+                {
+                    "account_id": account_id,
+                    "account_email": email_addr,
+                    "message_id": email["id"],
+                    "subject": email.get("subject", ""),
+                    "sender": email.get("sender", ""),
+                    "prompt_id": None,
+                    "prompt_name": None,
+                    "label_name": None,
+                    "actions": "no match",
+                    "llm_response": raw_llm_response,
+                }
+            )
+
         with database.atomic():
             Log.insert_many([{"level": lvl, "message": msg} for lvl, msg in pending_logs]).execute()
-            if pending_cats:
-                CategorizationHistory.insert_many(pending_cats).execute()
+            CategorizationHistory.insert_many(pending_cats).execute()
             ProcessedEmail.insert(account_id=account_id, message_id=email["id"]).on_conflict_ignore().execute()
     except LLMError as e:
         db.add_log(

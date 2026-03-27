@@ -26,6 +26,10 @@ def init_db():
     database.connect()
     database.create_tables(ALL_MODELS, safe=True)
     Setting.insert(key="poll_interval", value=str(POLL_INTERVAL)).on_conflict_ignore().execute()
+    # Migration: add llm_response column if it doesn't exist yet
+    existing_cols = {row[1] for row in database.execute_sql("PRAGMA table_info(categorization_history)").fetchall()}
+    if "llm_response" not in existing_cols:
+        database.execute_sql("ALTER TABLE categorization_history ADD COLUMN llm_response TEXT DEFAULT ''")
 
 
 # ---- Settings ----
@@ -251,11 +255,13 @@ def get_logs_range(start, end):
 # ---- Categorization History ----
 
 
-def get_categorization_history(account_id=None, prompt_id=None, subject=None, sender=None, limit=200):
+def get_categorization_history(account_id=None, prompt_id=None, subject=None, sender=None, limit=200, uncategorized_only=False):
     q = CategorizationHistory.select()
     if account_id is not None:
         q = q.where(CategorizationHistory.account_id == account_id)
-    if prompt_id is not None:
+    if uncategorized_only:
+        q = q.where(CategorizationHistory.prompt_id.is_null())
+    elif prompt_id is not None:
         q = q.where(CategorizationHistory.prompt_id == prompt_id)
     if subject:
         q = q.where(CategorizationHistory.subject.contains(subject))

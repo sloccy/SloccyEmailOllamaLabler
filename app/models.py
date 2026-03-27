@@ -89,6 +89,7 @@ class CategorizationHistory(BaseModel):
     prompt_name = TextField(null=True)
     label_name = TextField(null=True)
     actions = TextField(default="")
+    llm_response = TextField(default="")
 
     class Meta:
         table_name = "categorization_history"

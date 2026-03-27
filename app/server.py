@@ -565,15 +565,17 @@ def frag_history():
     prompt_id = request.args.get("prompt_id", "")
     subject = request.args.get("subject", "").strip()
     sender = request.args.get("sender", "").strip()
+    uncategorized_only = prompt_id == "none"
     try:
         limit = min(int(request.args.get("limit", 200)), HISTORY_MAX_LIMIT)
         account_id = int(account_id) if account_id else None
-        prompt_id = int(prompt_id) if prompt_id else None
+        prompt_id = int(prompt_id) if prompt_id and not uncategorized_only else None
     except ValueError:
         return _htmx_toast("Invalid filter parameters.")
     rows = db.get_categorization_history(
         account_id=account_id,
         prompt_id=prompt_id,
+        uncategorized_only=uncategorized_only,
         subject=subject or None,
         sender=sender or None,
         limit=limit,

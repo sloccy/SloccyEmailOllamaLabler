@@ -21,6 +21,7 @@
     hx-trigger="change"
     hx-include="#hist-filter-form">
     <option value="">All rules</option>
+    <option value="none">Uncategorized</option>
     {% for p in prompts %}
     <option value="{{ p.id }}">{{ p.name|e }}</option>
     {% endfor %}
