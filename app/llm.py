@@ -117,6 +117,7 @@ def _filter_think_chunks(buffer: str, in_think: bool, chunk: str):
 
 def stream_generate_prompt_instruction(description: str):
     """Generator that yields {"type": "think"|"content", "text": str} dicts."""
+    has_native_thinking = False
     in_think = False
     buffer = ""
     for chunk in _client.chat(
@@ -153,20 +154,23 @@ def stream_generate_prompt_instruction(description: str):
             "num_ctx": OLLAMA_NUM_CTX,
         },
     ):
-        token = chunk.message.content
         thinking = getattr(chunk.message, "thinking", None)
-        if not token and not thinking:
+        content = chunk.message.content
+
+        # Ollama library natively separates thinking from content
+        if thinking:
+            has_native_thinking = True
+            yield {"type": "think", "text": thinking}
             continue
-        if thinking and not token:
-            _logger.info("Ollama thinking token (content empty): %r", thinking[:80])
-            token = thinking
-        if not in_think and not buffer:
-            _logger.info("First token received from Ollama: %r", token[:50])
-        events, buffer, in_think = _filter_think_chunks(buffer, in_think, token)
-        for evt_type, evt_text in events:
-            if evt_text:
-                _logger.debug("Yielding SSE event: type=%s len=%d", evt_type, len(evt_text))
-                yield {"type": evt_type, "text": evt_text}
+        if content:
+            if has_native_thinking:
+                yield {"type": "content", "text": content}
+            else:
+                # Fallback: parse <think> tags from content (older ollama library)
+                events, buffer, in_think = _filter_think_chunks(buffer, in_think, content)
+                for evt_type, evt_text in events:
+                    if evt_text:
+                        yield {"type": evt_type, "text": evt_text}
     if buffer:
         yield {"type": "think" if in_think else "content", "text": buffer}
     _logger.info("stream_generate_prompt_instruction finished")
