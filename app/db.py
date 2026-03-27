@@ -255,7 +255,9 @@ def get_logs_range(start, end):
 # ---- Categorization History ----
 
 
-def get_categorization_history(account_id=None, prompt_id=None, subject=None, sender=None, limit=200, uncategorized_only=False):
+def get_categorization_history(
+    account_id=None, prompt_id=None, subject=None, sender=None, limit=200, uncategorized_only=False
+):
     q = CategorizationHistory.select()
     if account_id is not None:
         q = q.where(CategorizationHistory.account_id == account_id)
