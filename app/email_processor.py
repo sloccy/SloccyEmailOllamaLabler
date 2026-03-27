@@ -1,4 +1,5 @@
 from app import db, gmail_client, llm
+from app.llm import LLMError
 from app.config import GMAIL_LOOKBACK_HOURS, GMAIL_MAX_RESULTS
 from app.gmail_client import LABEL_INBOX, LABEL_SPAM, LABEL_UNREAD
 from app.models import CategorizationHistory, Log, ProcessedEmail, database
@@ -124,6 +125,9 @@ def _process_email(email: dict, account_id: int, email_addr: str, prompts: list,
             if pending_cats:
                 CategorizationHistory.insert_many(pending_cats).execute()
             ProcessedEmail.insert(account_id=account_id, message_id=email["id"]).on_conflict_ignore().execute()
+    except LLMError as e:
+        db.add_log("WARNING", f"[{email_addr}] LLM failure for '{email.get('subject', '?')[:60]}': {e} — will retry next scan")
+        return [], []
     except Exception as e:
         db.add_log("ERROR", f"[{email_addr}] Error processing email '{email.get('subject', '?')[:60]}': {e}")
         db.mark_processed(account_id, email["id"])  # prevent infinite retry on persistent failures

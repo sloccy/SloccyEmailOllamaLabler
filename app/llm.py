@@ -16,6 +16,10 @@ from app.config import (
 _client = _ollama.Client(host=OLLAMA_HOST, timeout=OLLAMA_TIMEOUT)
 
 
+class LLMError(Exception):
+    """Raised when the LLM fails to produce a usable classification."""
+
+
 def ensure_model_pulled() -> None:
     try:
         models = [m.model for m in _client.list().models]
@@ -81,10 +85,10 @@ No explanation, no markdown, just the JSON object."""
         return parsed
     except json.JSONDecodeError as e:
         db.add_log("ERROR", f"LLM parse error: {e!r} | raw: {raw!r}")
-        return {p["id"]: False for p in prompts}
+        raise LLMError(f"LLM parse error: {e!r}") from e
     except Exception as e:
         db.add_log("ERROR", f"LLM request failed: {e!r}")
-        return {p["id"]: False for p in prompts}
+        raise LLMError(f"LLM request failed: {e!r}") from e
 
 
 def _filter_think_chunks(buffer: str, in_think: bool, chunk: str):

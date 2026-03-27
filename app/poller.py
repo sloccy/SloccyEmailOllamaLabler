@@ -53,6 +53,7 @@ def update_interval(seconds: int) -> None:
 
 def _run_scan() -> None:
     if not _scan_lock.acquire(blocking=False):
+        db.add_log("DEBUG", "Scan skipped: previous scan still running.")
         return
     try:
         global _last_run, _last_cleanup
