@@ -75,29 +75,44 @@ function downloadLogs() {
   window.location.href = `/api/logs/download?start=${encodeURIComponent(toUTC(start))}&end=${encodeURIComponent(toUTC(end))}`;
 }
 
-// ---- Drag to reorder (SortableJS) ----
+// ---- Drag to reorder (SortableJS — lazy-loaded) ----
 let _promptsSortable = null;
+let _sortableReady = null;
+
+function _loadSortable() {
+  if (_sortableReady) return _sortableReady;
+  _sortableReady = new Promise((resolve) => {
+    const s = document.createElement('script');
+    s.src = '/static/vendor/Sortable.min.js';
+    s.onload = resolve;
+    document.head.appendChild(s);
+  });
+  return _sortableReady;
+}
 
 document.getElementById('prompts-list').addEventListener('htmx:afterSwap', function() {
-  _promptsSortable?.destroy();
-  _promptsSortable = new Sortable(this, {
-    handle: '.drag-handle',
-    draggable: '.card[data-id]',
-    animation: 150,
-    ghostClass: 'drag-ghost',
-    async onEnd() {
-      const list = document.getElementById('prompts-list');
-      const orderedIds = [...list.querySelectorAll('.card[data-id]')].map(c => parseInt(c.dataset.id));
-      const resp = await fetch('/api/prompts/reorder', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ordered_ids: orderedIds }),
-      });
-      if (!resp.ok) {
-        toast('Failed to save order.', 'error');
-        const accountId = document.getElementById('prompt-filter-account')?.value || '';
-        htmx.ajax('GET', accountId ? `/fragments/prompts?account_id=${accountId}` : '/fragments/prompts', { target: '#prompts-list', swap: 'innerHTML' });
-      }
-    },
+  const el = this;
+  _loadSortable().then(() => {
+    _promptsSortable?.destroy();
+    _promptsSortable = new Sortable(el, {
+      handle: '.drag-handle',
+      draggable: '.card[data-id]',
+      animation: 150,
+      ghostClass: 'drag-ghost',
+      async onEnd() {
+        const list = document.getElementById('prompts-list');
+        const orderedIds = [...list.querySelectorAll('.card[data-id]')].map(c => parseInt(c.dataset.id));
+        const resp = await fetch('/api/prompts/reorder', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ordered_ids: orderedIds }),
+        });
+        if (!resp.ok) {
+          toast('Failed to save order.', 'error');
+          const accountId = document.getElementById('prompt-filter-account')?.value || '';
+          htmx.ajax('GET', accountId ? `/fragments/prompts?account_id=${accountId}` : '/fragments/prompts', { target: '#prompts-list', swap: 'innerHTML' });
+        }
+      },
+    });
   });
 });
 

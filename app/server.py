@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from urllib.parse import parse_qs, urlparse
 
 from flask import Flask, Response, jsonify, make_response, render_template, request, session
+from flask_compress import Compress
 
 from app import db, gmail_client, llm, poller
 from app.config import HISTORY_MAX_LIMIT, MIN_POLL_INTERVAL, OLLAMA_HOST, OLLAMA_MODEL, POLL_INTERVAL
@@ -17,6 +18,8 @@ _logger = logging.getLogger("ollamail.server")
 
 app = Flask(__name__, template_folder="templates")
 app.secret_key = None
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 31536000
+Compress(app)
 
 _ASSET_VERSION = str(int(_time.time()))
 

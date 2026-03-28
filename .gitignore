@@ -6,8 +6,9 @@ __pycache__/
 *.so
 *.egg
 *.egg-info/
-dist/
-build/
+/dist/
+/build/
+node_modules/
 .eggs/
 .venv/
 venv/
