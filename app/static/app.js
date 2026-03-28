@@ -48,7 +48,7 @@ window.addEventListener('DOMContentLoaded', function() {
 function exportPrompts() {
   const accountId = document.getElementById('prompt-filter-account')?.value || '';
   window.location.href = accountId
-    ? `/api/prompts/export?account_id=${accountId}&name=${encodeURIComponent(accountId)}`
+    ? `/api/prompts/export?account_id=${encodeURIComponent(accountId)}&name=${encodeURIComponent(accountId)}`
     : `/api/prompts/export?name=all`;
 }
 
