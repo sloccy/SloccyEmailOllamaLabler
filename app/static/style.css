@@ -143,15 +143,14 @@ h1,h2,h3,h4,h5,h6 { letter-spacing: -0.025em; }
 .setting-row:hover { background: var(--hover-subtle-bg); }
 
 /* History table */
-.history-table { table-layout: fixed; width: 100%; }
+.history-table { width: 100%; }
 .history-table th { text-transform: uppercase; font-size: 0.6875rem; letter-spacing: 0.10em; font-weight: 600; opacity: 0.6; }
-.col-time { width: 52px; max-width: 52px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; padding-left: 4px; padding-right: 2px; }
-.col-account { width: 12%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; }
-.col-subject { word-break: break-word; }
-.col-sender { width: 13%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-.col-rule { width: 15%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.col-actions { width: 20%; overflow: hidden; }
-.col-actions .badge { white-space: normal; }
+.col-time { width: 1%; white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; padding-right: 2px; }
+.col-account { width: 12%; max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; }
+.col-subject { max-width: 0; word-break: break-word; }
+.col-sender { width: 18%; max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.col-rule { width: 1%; white-space: nowrap; }
+.col-actions { width: 1%; white-space: nowrap; }
 .badge.font-monospace { font-size: 11px; padding: 2px 6px; }
 
 /* OAuth */
