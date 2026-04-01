@@ -22,7 +22,7 @@
       {% if r.llm_response %}
       <details class="d-inline-block ms-1">
         <summary class="text-muted" style="cursor:pointer;font-size:.75rem;list-style:none;">LLM</summary>
-        <pre class="mt-1 p-1 border rounded bg-body-secondary font-monospace" style="font-size:.7rem;max-width:40ch;white-space:pre-wrap;word-break:break-all;">{{ r.llm_response|e }}</pre>
+        <pre class="mt-1 p-1 border rounded bg-body-secondary font-monospace" style="font-size:.7rem;max-width:100%;white-space:pre-wrap;word-break:break-all;">{{ r.llm_response|e }}</pre>
       </details>
       {% endif %}
     </td>
