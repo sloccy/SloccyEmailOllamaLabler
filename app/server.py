@@ -9,8 +9,8 @@ from datetime import UTC, datetime
 from urllib.parse import parse_qs, urlparse
 
 from flask import Flask, Response, jsonify, make_response, render_template, request, session
-from markupsafe import Markup
 from flask_compress import Compress
+from markupsafe import Markup
 
 from app import db, gmail_client, llm, poller
 from app.config import HISTORY_MAX_LIMIT, MIN_POLL_INTERVAL, OLLAMA_HOST, OLLAMA_MODEL, POLL_INTERVAL
