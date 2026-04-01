@@ -65,9 +65,9 @@ def _fmt_date_stacked(ts):
         return Markup("—")
     try:
         d = datetime.fromisoformat(ts)
-        return Markup(f"{d.day} {d.strftime('%b')}<br><span class='text-muted'>{d.strftime('%H:%M')}</span>")
+        return Markup(f"{d.day} {d.strftime('%b')}<br><span class='text-muted'>{d.strftime('%H:%M')}</span>")  # noqa: S704
     except Exception:
-        return Markup(str(ts))
+        return Markup(str(ts))  # noqa: S704
 
 
 app.jinja_env.filters["fmtdate"] = _fmt_date
@@ -187,7 +187,7 @@ def api_reorder_prompts():
         return jsonify({"error": "ordered_ids required"}), 400
     try:
         db.reorder_prompts([int(i) for i in ordered_ids])
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return jsonify({"error": "ordered_ids must be integers."}), 400
     return jsonify({"ok": True})
 
@@ -197,10 +197,7 @@ def api_export_prompts():
     account_id = request.args.get("account_id")
     account_name = request.args.get("name", "all")
 
-    if account_id:
-        prompts = db.list_prompts(account_id=int(account_id))
-    else:
-        prompts = db.list_prompts()
+    prompts = db.list_prompts(account_id=int(account_id)) if account_id else db.list_prompts()
 
     export_fields = [
         "name",
@@ -340,7 +337,7 @@ def api_import_config():
                     account_id=account_id,
                 )
                 summary["prompts"]["added"] += 1
-        except (KeyError, TypeError):
+        except KeyError, TypeError:
             summary["prompts"]["skipped"] += 1
 
     # Settings
@@ -363,7 +360,7 @@ def api_import_config():
         if global_days is not None:
             try:
                 global_days = int(global_days)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 global_days = None
         if global_days is not None and global_days >= 1:
             if not db.has_global_retention(account_id):
@@ -374,7 +371,7 @@ def api_import_config():
         for lr in ret.get("label_rules", []):
             try:
                 days = int(lr["days"])
-            except (ValueError, TypeError, KeyError):
+            except ValueError, TypeError, KeyError:
                 summary["retention"]["skipped"] += 1
                 continue
             if days < 1:
@@ -618,7 +615,7 @@ def _retention_panel(account_id, account=None, service=None, toast=None):
         try:
             svc = service or gmail_client.get_service_and_refresh(account)
             gmail_labels = gmail_client.list_labels(svc)
-        except Exception:
+        except Exception:  # noqa: S110
             pass
     return fragment_response(
         "fragments/retention_panel.html",
@@ -849,4 +846,4 @@ def create_app():
 
 if __name__ == "__main__":
     application = create_app()
-    application.run(host="0.0.0.0", port=5000, debug=False)
+    application.run(host="0.0.0.0", port=5000, debug=False)  # noqa: S104

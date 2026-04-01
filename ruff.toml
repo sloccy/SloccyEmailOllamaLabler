@@ -1,8 +1,8 @@
 line-length = 120
-target-version = "py313"
+target-version = "py314"
 
 [lint]
-select = ["E", "F", "W", "I", "UP"]
+select = ["E", "F", "W", "I", "UP", "B", "S", "SIM"]
 ignore = [
     "E501",   # line too long (handled by formatter)
 ]
