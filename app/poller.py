@@ -1,45 +1,37 @@
 import threading
 import time
-from datetime import UTC, datetime
-
-from apscheduler.schedulers.background import BackgroundScheduler
 
 from app import db
 from app.config import GMAIL_LOOKBACK_HOURS, POLL_INTERVAL
 from app.email_processor import process_account
 from app.retention import cleanup_retention
 
-_scheduler = BackgroundScheduler(daemon=True)
 _scan_lock = threading.Lock()
+_stop = threading.Event()
+_interval: int = POLL_INTERVAL
 _last_run: float | None = None
-_last_cleanup = 0.0
+_last_cleanup: float = 0.0
+_next_run: float | None = None
+_running: bool = False
 _CLEANUP_INTERVAL = 3600
 
 
 def get_status() -> dict:
-    job = _scheduler.get_job("poll")
-    next_run = job.next_run_time.timestamp() if job and job.next_run_time else None
     return {
-        "running": _scheduler.running,
+        "running": _running,
         "last_run": _last_run,
-        "next_run": next_run,
+        "next_run": _next_run,
     }
 
 
 def start() -> None:
-    if _scheduler.running:
+    global _running, _interval, _next_run
+    if _running:
         return
-    interval = int(db.get_setting("poll_interval", str(POLL_INTERVAL)))
-    _scheduler.add_job(
-        _run_scan,
-        "interval",
-        seconds=interval,
-        id="poll",
-        max_instances=1,
-        replace_existing=True,
-        next_run_time=datetime.now(UTC),
-    )
-    _scheduler.start()
+    _interval = int(db.get_setting("poll_interval", str(POLL_INTERVAL)))
+    _next_run = time.time()
+    _running = True
+    threading.Thread(target=_loop, daemon=True).start()
 
 
 def run_now() -> None:
@@ -47,8 +39,18 @@ def run_now() -> None:
 
 
 def update_interval(seconds: int) -> None:
-    if _scheduler.running:
-        _scheduler.reschedule_job("poll", trigger="interval", seconds=seconds)
+    global _interval, _next_run
+    _interval = seconds
+    if _last_run is not None:
+        _next_run = _last_run + seconds
+
+
+def _loop() -> None:
+    global _next_run
+    while not _stop.wait(1.0):
+        if _next_run is not None and time.time() >= _next_run:
+            _run_scan()
+            _next_run = time.time() + _interval
 
 
 def _run_scan() -> None:

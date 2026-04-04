@@ -3,8 +3,8 @@ import datetime
 import json
 import os
 import time
+from html.parser import HTMLParser
 
-from bs4 import BeautifulSoup
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
@@ -26,6 +26,33 @@ LABEL_SPAM = "SPAM"
 LABEL_INBOX = "INBOX"
 LABEL_UNREAD = "UNREAD"
 LABEL_TRASH = "TRASH"
+
+
+class _HTMLTextExtractor(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self._parts = []
+        self._skip = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "style"):
+            self._skip += 1
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style"):
+            self._skip = max(0, self._skip - 1)
+
+    def handle_data(self, data):
+        if not self._skip:
+            stripped = data.strip()
+            if stripped:
+                self._parts.append(stripped)
+
+
+def _html_to_text(html: str) -> str:
+    extractor = _HTMLTextExtractor()
+    extractor.feed(html)
+    return "\n".join(extractor._parts)
 
 
 def get_auth_url(state: str) -> str:
@@ -212,7 +239,7 @@ def _extract_body(payload) -> str:
         return base64.urlsafe_b64decode(plain_data).decode("utf-8", errors="ignore")
     if html_data:
         html = base64.urlsafe_b64decode(html_data).decode("utf-8", errors="ignore")
-        return BeautifulSoup(html, "html.parser").get_text(separator="\n", strip=True)
+        return _html_to_text(html)
     # Recurse into nested parts (e.g., multipart/alternative within multipart/mixed)
     for part in payload["parts"]:
         result = _extract_body(part)

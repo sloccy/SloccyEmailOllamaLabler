@@ -1,4 +1,5 @@
 import csv
+import gzip
 import io
 import json
 import logging
@@ -9,7 +10,6 @@ from datetime import UTC, datetime
 from urllib.parse import parse_qs, urlparse
 
 from flask import Flask, Response, jsonify, make_response, render_template, request, session
-from flask_compress import Compress
 from markupsafe import Markup
 
 from app import db, gmail_client, llm, poller
@@ -20,9 +20,28 @@ _logger = logging.getLogger("ollamail.server")
 app = Flask(__name__, template_folder="templates")
 app.secret_key = None
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 31536000
-Compress(app)
 
 _ASSET_VERSION = str(int(_time.time()))
+
+
+@app.after_request
+def _compress(response):
+    if "gzip" not in request.headers.get("Accept-Encoding", ""):
+        return response
+    if response.direct_passthrough:
+        return response
+    if response.headers.get("Content-Encoding"):
+        return response
+    if response.content_type and "event-stream" in response.content_type:
+        return response
+    data = response.get_data()
+    if len(data) < 500:
+        return response
+    compressed = gzip.compress(data)
+    response.set_data(compressed)
+    response.headers["Content-Encoding"] = "gzip"
+    response.headers["Content-Length"] = len(compressed)
+    return response
 
 
 @app.context_processor
