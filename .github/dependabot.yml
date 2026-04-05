@@ -9,9 +9,6 @@ updates:
       npm-deps:
         patterns:
           - "*"
-    labels:
-      - dependencies
-      - javascript
 
   - package-ecosystem: pip
     directory: /
@@ -22,22 +19,13 @@ updates:
       python-deps:
         patterns:
           - "*"
-    labels:
-      - dependencies
-      - python
 
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: daily
-    labels:
-      - dependencies
-      - docker
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: daily
-    labels:
-      - dependencies
-      - ci
