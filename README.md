@@ -108,7 +108,7 @@ services:
       - ./credentials:/credentials
     environment:
       - OLLAMA_HOST=http://ollama:11434
-      - OLLAMA_MODEL=llama3.2
+      - OLLAMA_MODEL=qwen3.5:4b-q4_K_M
       - DATA_DIR=/data
       - CREDENTIALS_FILE=/credentials/credentials.json
       # Optional overrides — see Configuration Reference below
@@ -188,7 +188,7 @@ python -c "from app.server import create_app; create_app().run(host='0.0.0.0', p
 You'll also need [Ollama](https://ollama.com) running locally and the model pulled:
 
 ```bash
-ollama pull llama3.2
+ollama pull qwen3.5:4b-q4_K_M
 ```
 
 ---
@@ -200,7 +200,7 @@ All settings are controlled via environment variables.
 | Variable | Default | Description |
 |---|---|---|
 | `OLLAMA_HOST` | `http://localhost:11434` | URL of the Ollama instance |
-| `OLLAMA_MODEL` | `llama3.2` | Model to use for classification |
+| `OLLAMA_MODEL` | `qwen3.5:4b-q4_K_M` | Model to use for classification |
 | `OLLAMA_TIMEOUT` | `600` | Seconds to wait for Ollama to respond or pull a model |
 | `OLLAMA_NUM_CTX` | `4096` | LLM context window size in tokens |
 | `OLLAMA_GENERATE_NUM_PREDICT` | `4096` | Max tokens for longer generation tasks (e.g. AI prompt builder) |
@@ -251,7 +251,7 @@ All settings are controlled via environment variables.
 
 - Tested on Raspberry Pi 4 (4 GB RAM) with 64-bit OS.
 - Inference time is 5–20 seconds per email per prompt rule depending on email length and the model used.
-- Smaller quantized models (e.g. `llama3.2:1b`) are significantly faster on CPU-only hardware.
+- Smaller quantized models are significantly faster on CPU-only hardware.
 - `restart: unless-stopped` in Docker Compose handles automatic startup after reboots.
 - The `ollama_data` named volume persists pulled models across container restarts.
 
