@@ -119,31 +119,27 @@ def stream_generate_prompt_instruction(description: str):
                 "role": "system",
                 "content": (
                     "You write email filter rules for an AI classifier. "
-                    "The classifier reads email content and infers meaning, intent, and context — "
-                    "it is NOT limited to keywords or sender addresses. "
-                    "Rules should describe what an email is about, its purpose, and tone. "
-                    "Be specific about what should match and what should not.\n"
-                    "Output only the rule text. No preamble, no quotes, no explanation."
+                    "Output only the rule text. No preamble, no drafts, no self-critique, no quotes, no explanation."
                 ),
             },
             {
                 "role": "user",
                 "content": (
-                    f'A user wants to automatically label certain emails. They described:\n\n"{description}"\n\n'
-                    "Write a precise classifier instruction (2-5 sentences). "
-                    "Focus on the meaning and context of the email — what it is about, why it was sent, "
-                    "and who it is intended for. Describe what distinguishes matching emails from "
-                    "similar-but-different ones based on content and intent, not just surface signals "
-                    "like sender address or keywords.\n\n"
-                    "Respond with ONLY the instruction text."
+                    f'Write a 2-4 sentence classifier instruction for emails matching: "{description}"\n\n'
+                    "The instruction must describe: what the email is about, its purpose/intent, "
+                    "and what distinguishes it from similar-but-non-matching emails. "
+                    "Do not use keywords or sender addresses as criteria — focus on meaning and context.\n\n"
+                    "Output ONLY the instruction text."
                 ),
             },
         ],
         stream=True,
+        think=True,
         options={
-            "temperature": 0.7,
-            "num_predict": OLLAMA_GENERATE_NUM_PREDICT,
+            "temperature": 0.5,
+            "num_predict": 1024,
             "num_ctx": OLLAMA_NUM_CTX,
+            "repeat_penalty": 1.5,
         },
     ):
         thinking = getattr(chunk.message, "thinking", None)
