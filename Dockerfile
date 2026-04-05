@@ -6,13 +6,13 @@ RUN npm ci
 COPY app/static/ ./app/static/
 RUN npm run build
 
-FROM python:3.14-slim
+FROM python:3.14-alpine
 
 WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
-    && useradd -r -u 1000 -s /sbin/nologin appuser
+    && adduser -D -u 1000 -s /sbin/nologin appuser
 
 COPY app/ ./app/
 COPY --from=assets /build/app/static/dist/ ./app/static/dist/
