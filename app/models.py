@@ -124,6 +124,13 @@ class LabelExemption(BaseModel):
         indexes = ((("account_id", "label_name"), True),)
 
 
+class SchemaVersion(BaseModel):
+    version = IntegerField(default=0)
+
+    class Meta:
+        table_name = "schema_version"
+
+
 ALL_MODELS = [
     Account,
     Prompt,
@@ -134,4 +141,5 @@ ALL_MODELS = [
     AccountRetention,
     LabelRetention,
     LabelExemption,
+    SchemaVersion,
 ]

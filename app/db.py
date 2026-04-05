@@ -15,10 +15,35 @@ from app.models import (
     Log,
     ProcessedEmail,
     Prompt,
+    SchemaVersion,
     Setting,
     _now,
     database,
 )
+
+# ---- Migrations ----
+
+
+def _migration_001_add_llm_response():
+    existing_cols = {row[1] for row in database.execute_sql("PRAGMA table_info(categorization_history)").fetchall()}
+    if "llm_response" not in existing_cols:
+        database.execute_sql("ALTER TABLE categorization_history ADD COLUMN llm_response TEXT DEFAULT ''")
+
+
+_MIGRATIONS = [
+    (1, _migration_001_add_llm_response),
+]
+
+
+def _run_migrations():
+    row = SchemaVersion.select().first()
+    if row is None:
+        row = SchemaVersion.create(version=0)
+    for version, func in _MIGRATIONS:
+        if version > row.version:
+            func()
+            row.version = version
+            row.save()
 
 
 def init_db():
@@ -26,10 +51,7 @@ def init_db():
     database.connect()
     database.create_tables(ALL_MODELS, safe=True)
     Setting.insert(key="poll_interval", value=str(POLL_INTERVAL)).on_conflict_ignore().execute()
-    # Migration: add llm_response column if it doesn't exist yet
-    existing_cols = {row[1] for row in database.execute_sql("PRAGMA table_info(categorization_history)").fetchall()}
-    if "llm_response" not in existing_cols:
-        database.execute_sql("ALTER TABLE categorization_history ADD COLUMN llm_response TEXT DEFAULT ''")
+    _run_migrations()
 
 
 # ---- Settings ----

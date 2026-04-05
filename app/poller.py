@@ -7,6 +7,7 @@ from app.email_processor import process_account
 from app.retention import cleanup_retention
 
 _scan_lock = threading.Lock()
+_state_lock = threading.Lock()
 _stop = threading.Event()
 _interval: int = POLL_INTERVAL
 _last_run: float | None = None
@@ -17,20 +18,22 @@ _CLEANUP_INTERVAL = 3600
 
 
 def get_status() -> dict:
-    return {
-        "running": _running,
-        "last_run": _last_run,
-        "next_run": _next_run,
-    }
+    with _state_lock:
+        return {
+            "running": _running,
+            "last_run": _last_run,
+            "next_run": _next_run,
+        }
 
 
 def start() -> None:
     global _running, _interval, _next_run
-    if _running:
-        return
-    _interval = int(db.get_setting("poll_interval", str(POLL_INTERVAL)))
-    _next_run = time.time()
-    _running = True
+    with _state_lock:
+        if _running:
+            return
+        _interval = int(db.get_setting("poll_interval", str(POLL_INTERVAL)))
+        _next_run = time.time()
+        _running = True
     threading.Thread(target=_loop, daemon=True).start()
 
 
@@ -40,17 +43,21 @@ def run_now() -> None:
 
 def update_interval(seconds: int) -> None:
     global _interval, _next_run
-    _interval = seconds
-    if _last_run is not None:
-        _next_run = _last_run + seconds
+    with _state_lock:
+        _interval = seconds
+        if _last_run is not None:
+            _next_run = _last_run + seconds
 
 
 def _loop() -> None:
     global _next_run
     while not _stop.wait(1.0):
-        if _next_run is not None and time.time() >= _next_run:
+        with _state_lock:
+            should_scan = _next_run is not None and time.time() >= _next_run
+        if should_scan:
             _run_scan()
-            _next_run = time.time() + _interval
+            with _state_lock:
+                _next_run = time.time() + _interval
 
 
 def _run_scan() -> None:
@@ -59,8 +66,9 @@ def _run_scan() -> None:
         return
     try:
         global _last_run, _last_cleanup
-        _last_run = time.time()
-        now = _last_run
+        now = time.time()
+        with _state_lock:
+            _last_run = now
         if now - _last_cleanup >= _CLEANUP_INTERVAL:
             db.trim_logs()
             db.trim_processed_emails(GMAIL_LOOKBACK_HOURS)
