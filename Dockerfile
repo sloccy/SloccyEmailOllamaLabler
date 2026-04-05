@@ -1,4 +1,4 @@
-FROM node:22-slim AS assets
+FROM node:24-slim AS assets
 
 WORKDIR /build
 COPY package.json package-lock.json ./
