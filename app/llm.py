@@ -8,7 +8,6 @@ from ollama import ResponseError as _ResponseError
 from app import db
 from app.config import (
     DEBUG_LOGGING,
-    OLLAMA_GENERATE_NUM_PREDICT,
     OLLAMA_HOST,
     OLLAMA_MODEL,
     OLLAMA_NUM_CTX,
