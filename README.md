@@ -3,13 +3,13 @@
   <h1>OllaMail</h1>
   <p><strong>Local LLM email labeling for Gmail — fully self-hosted, no data leaves your machine.</strong></p>
   <img src="https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white" alt="Docker" />
-  <img src="https://img.shields.io/badge/Docker_Model_Runner-powered-2496ED?logo=docker&logoColor=white" alt="Docker Model Runner" />
+  <img src="https://img.shields.io/badge/Ollama-powered-black?logo=llama&logoColor=white" alt="Ollama" />
   <img src="https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white" alt="Python" />
 </div>
 
 ---
 
-OllaMail connects to your Gmail accounts via OAuth, fetches recent emails on a schedule, and runs each email through rules you define in plain English. A local LLM (via [Docker Model Runner](https://docs.docker.com/ai/model-runner/)) decides whether each rule applies and performs the matching action automatically — applying Gmail labels, archiving, trashing, and more. No email content ever leaves your machine.
+OllaMail connects to your Gmail accounts via OAuth, fetches recent emails on a schedule, and runs each email through rules you define in plain English. A local LLM (via [Ollama](https://ollama.com)) decides whether each rule applies and performs the matching action automatically — applying Gmail labels, archiving, trashing, and more. No email content ever leaves your machine.
 
 ## Features
 
@@ -21,7 +21,7 @@ OllaMail connects to your Gmail accounts via OAuth, fetches recent emails on a s
 - **AI prompt builder** — describe what you want to catch in plain English; the LLM writes the classifier instruction for you (streaming output)
 - **Batch classification** — all rules for an email are evaluated in a single LLM call for efficiency
 - **Multiple accounts** — add as many Gmail accounts as you like via OAuth
-- **Fully local** — all LLM inference runs on-device via Docker Model Runner; no email content is sent to any API
+- **Fully local** — all LLM inference runs on-device via Ollama; no email content is sent to any API
 - **Web UI** — manage accounts, rules, retention, settings, and logs from a browser
 - **Auto-label creation** — labels are created in Gmail automatically if they don't exist
 - **Email retention management** — set per-label or global retention rules that auto-trash old emails; add label exemptions to protect important labels
@@ -38,14 +38,9 @@ OllaMail connects to your Gmail accounts via OAuth, fetches recent emails on a s
 
 ### Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/) and Docker Compose v2.38.0+
+- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
 - A Google Cloud project (free tier is fine)
 - A machine with at least 4 GB RAM
-- **For GPU acceleration (optional):** Run once on the host before `docker compose up`:
-  ```bash
-  docker model install-runner --gpu cuda
-  ```
-  Without this, Docker Model Runner will use CPU-only inference.
 
 ---
 
@@ -83,6 +78,26 @@ ollamail/
 
 ```yaml
 services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollamail-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_NUM_PARALLEL=2
+      - OLLAMA_KEEP_ALIVE=6m
+    restart: unless-stopped
+    networks:
+      - internal
+    # Uncomment to enable NVIDIA GPU support:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
   app:
     image: ghcr.io/sloccy/ollamail:latest
     container_name: ollamail-app
@@ -92,24 +107,22 @@ services:
       - ./data:/data
       - ./credentials:/credentials
     environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL=qwen3.5:4b-q4_K_M
       - DATA_DIR=/data
       - CREDENTIALS_FILE=/credentials/credentials.json
       # Optional overrides — see Configuration Reference below
       # - GMAIL_LOOKBACK_HOURS=24
       # - GMAIL_MAX_RESULTS=50
       # - POLL_INTERVAL=300
-    models:
-      llm:
-        endpoint_var: LLM_BASE_URL
-        model_var: LLM_MODEL
+    depends_on:
+      - ollama
     restart: unless-stopped
     networks:
       - internal
 
-models:
-  llm:
-    model: hf.co/unsloth/Qwen3.5-9B-GGUF:UD-Q5_K_XL
-    context_size: 8192
+volumes:
+  ollama_data:
 
 networks:
   internal:
@@ -123,7 +136,7 @@ networks:
 docker compose up -d
 ```
 
-On first start Docker Model Runner will automatically pull the configured model. This can take a few minutes depending on your connection speed. Watch progress with:
+On first start the app will automatically pull the configured Ollama model. This can take a few minutes depending on your connection speed. Watch progress with:
 
 ```bash
 docker compose logs -f app
@@ -164,7 +177,7 @@ pip install -r requirements.txt
 npm install && npm run build
 
 # Set required environment variables
-export LLM_BASE_URL=http://model-runner.docker.internal/engines/llama.cpp/v1
+export OLLAMA_HOST=http://localhost:11434
 export DATA_DIR=./data
 export CREDENTIALS_FILE=./credentials/credentials.json
 
@@ -172,20 +185,25 @@ export CREDENTIALS_FILE=./credentials/credentials.json
 python -c "from app.server import create_app; create_app().run(host='0.0.0.0', port=5000, debug=True)"
 ```
 
-You'll need Docker Model Runner (or any OpenAI-compatible llama.cpp server) accessible at `LLM_BASE_URL`. For local development outside Docker, point `LLM_BASE_URL` at `http://localhost:12434/engines/llama.cpp/v1`.
+You'll also need [Ollama](https://ollama.com) running locally and the model pulled:
+
+```bash
+ollama pull qwen3.5:4b-q4_K_M
+```
 
 ---
 
 ## Configuration Reference
 
-All settings are controlled via environment variables. `LLM_BASE_URL` and `LLM_MODEL` are auto-injected by Docker Compose when using the `models:` block.
+All settings are controlled via environment variables.
 
 | Variable | Default | Description |
 |---|---|---|
-| `LLM_BASE_URL` | `http://model-runner.docker.internal/engines/llama.cpp/v1` | OpenAI-compatible endpoint for the model runner |
-| `LLM_MODEL` | `hf.co/unsloth/Qwen3.5-9B-GGUF:UD-Q5_K_XL` | Model to use for classification |
-| `LLM_TIMEOUT` | `600` | Seconds to wait for the model runner to respond |
-| `LLM_NUM_PREDICT` | `8192` | Max tokens for longer generation tasks (e.g. AI prompt builder) |
+| `OLLAMA_HOST` | `http://localhost:11434` | URL of the Ollama instance |
+| `OLLAMA_MODEL` | `qwen3.5:4b-q4_K_M` | Model to use for classification |
+| `OLLAMA_TIMEOUT` | `600` | Seconds to wait for Ollama to respond or pull a model |
+| `OLLAMA_NUM_CTX` | `4096` | LLM context window size in tokens |
+| `OLLAMA_GENERATE_NUM_PREDICT` | `4096` | Max tokens for longer generation tasks (e.g. AI prompt builder) |
 | `GMAIL_MAX_RESULTS` | `50` | Emails fetched per inbox scan (only unprocessed ones are classified) |
 | `GMAIL_LOOKBACK_HOURS` | `24` | How far back to look for emails on each scan |
 | `EMAIL_BODY_TRUNCATION` | `3000` | Max characters of email body sent to the LLM |
@@ -197,29 +215,27 @@ All settings are controlled via environment variables. `LLM_BASE_URL` and `LLM_M
 | `DATA_DIR` | `/data` | Directory where the SQLite database is stored |
 | `CREDENTIALS_FILE` | `/credentials/credentials.json` | Path to the Google OAuth client credentials JSON |
 
-Context window size is configured via `context_size` in the `models:` block of `docker-compose.yml`, not as an env var.
-
 ---
 
 ## How It Works
 
 ```
-┌─────────────┐     OAuth      ┌─────────────────┐
-│   Gmail API │ ◄────────────► │    OllaMail     │
-└─────────────┘                │    (Flask)      │
-                               └────────┬────────┘
-                                        │ email body + all rules
-                               ┌────────▼────────┐
-                               │  Docker Model   │
-                               │  Runner         │
-                               │  (llama.cpp)    │
-                               └────────┬────────┘
-                                        │ per-rule YES/NO (single call)
-                               ┌────────▼────────┐
-                               │  Apply label /  │
-                               │  action via     │
-                               │  Gmail API      │
-                               └─────────────────┘
+┌─────────────┐     OAuth      ┌─────────────┐
+│   Gmail API │ ◄────────────► │  OllaMail   │
+└─────────────┘                │    (Flask)  │
+                               └──────┬──────┘
+                                      │ email body + all rules
+                               ┌──────▼──────┐
+                               │   Ollama    │
+                               │  (local LLM)│
+                               └──────┬──────┘
+                                      │ per-rule YES/NO (single call)
+                               ┌──────▼──────┐
+                               │ Apply label │
+                               │ / action    │
+                               │ via Gmail   │
+                               │ API         │
+                               └─────────────┘
 ```
 
 1. The poller wakes up every N seconds (configurable in the UI).
@@ -237,7 +253,7 @@ Context window size is configured via `context_size` in the `models:` block of `
 - Inference time is 5–20 seconds per email per prompt rule depending on email length and the model used.
 - Smaller quantized models are significantly faster on CPU-only hardware.
 - `restart: unless-stopped` in Docker Compose handles automatic startup after reboots.
-- The model is pulled and cached by Docker Model Runner automatically on first compose-up.
+- The `ollama_data` named volume persists pulled models across container restarts.
 
 ---
 
@@ -249,6 +265,6 @@ Context window size is configured via `context_size` in the `models:` block of `
 | WSGI server | Waitress |
 | UI | Bootstrap 5.3 (dark mode) + HTMX 2.0 |
 | Database | SQLite via Peewee ORM |
-| LLM runtime | Docker Model Runner (llama.cpp) |
+| LLM runtime | Ollama |
 | Gmail integration | Google OAuth 2.0 + Gmail API |
 | Deployment | Docker / Docker Compose |

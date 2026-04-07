@@ -1,4 +1,25 @@
 services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollamail-ollama
+    privileged: true
+    cpuset: "0,1,2,3,4"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_NUM_PARALLEL=2
+      - OLLAMA_KEEP_ALIVE=6m
+    restart: unless-stopped
+    networks:
+      - internal
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
   app:
     image: ghcr.io/sloccy/ollamail:latest
     container_name: ollamail-app
@@ -8,31 +29,34 @@ services:
       - /home/docker/docker/ollamail/data:/data
       - /home/docker/docker/ollamail/credentials:/credentials
     environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL=qwen3:8b-q4_K_M
       - DATA_DIR=/data
       - CREDENTIALS_FILE=/credentials/credentials.json
       - BASE_URL=http://10.0.0.5:5001
       # Only process emails received within this many hours (default: 24)
       # Increase for a longer catch-up window, e.g. 168 = last 7 days
       - GMAIL_LOOKBACK_HOURS=24
-      # How long to wait (seconds) for the model runner to respond (default: 600)
-      - LLM_TIMEOUT=600
-      # Max tokens the LLM can generate per response (default: 8192)
-      #- LLM_NUM_PREDICT=8192
+      # How long to wait (seconds) for Ollama to respond / pull a model (default: 600)
+      - OLLAMA_TIMEOUT=600
+      # LLM context window size in tokens (default: 4096)
+      # Increase if you have many rules or long emails, at the cost of more VRAM
+      #- OLLAMA_NUM_CTX=4096
+      # Max tokens the LLM can generate per response (default: 200)
+      # The JSON classification response is small, so 200 is plenty
+      #- OLLAMA_GENERATE_NUM_PREDICT=200
       # How many emails to fetch per inbox scan (default: 50)
       # Only unprocessed emails are classified, so higher values are safe
       - GMAIL_MAX_RESULTS=10
-    models:
-      llm:
-        endpoint_var: LLM_BASE_URL
-        model_var: LLM_MODEL
+
+    depends_on:
+      - ollama
     restart: unless-stopped
     networks:
       - internal
 
-models:
-  llm:
-    model: hf.co/unsloth/Qwen3.5-9B-GGUF:UD-Q5_K_XL
-    context_size: 8192
+volumes:
+  ollama_data:
 
 networks:
   internal:

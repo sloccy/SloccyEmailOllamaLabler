@@ -13,7 +13,7 @@ from flask import Flask, Response, jsonify, make_response, render_template, requ
 from markupsafe import Markup
 
 from app import db, gmail_client, llm, poller
-from app.config import HISTORY_MAX_LIMIT, LLM_BASE_URL, LLM_MODEL, MIN_POLL_INTERVAL, POLL_INTERVAL
+from app.config import HISTORY_MAX_LIMIT, MIN_POLL_INTERVAL, OLLAMA_HOST, OLLAMA_MODEL, POLL_INTERVAL
 
 _logger = logging.getLogger("ollamail.server")
 
@@ -146,8 +146,8 @@ def _prompt_card_context(prompt):
 def _settings_context():
     return {
         "poll_interval": int(db.get_setting("poll_interval", str(POLL_INTERVAL))),
-        "llm_model": LLM_MODEL,
-        "llm_endpoint": LLM_BASE_URL,
+        "ollama_model": OLLAMA_MODEL,
+        "ollama_host": OLLAMA_HOST,
     }
 
 

@@ -6,12 +6,12 @@
         <div class="flex-shrink-0 ms-4"><input type="number" class="form-control form-control-sm" name="poll_interval" min="30" step="30" value="{{ poll_interval }}" style="width:100px;text-align:right;"></div>
       </div>
       <div class="d-flex align-items-center justify-content-between py-3 px-4 border-bottom setting-row">
-        <div><div class="fw-medium">LLM model</div><div class="small text-muted mt-1">Set via LLM_MODEL in docker-compose.yml</div></div>
-        <div class="flex-shrink-0 ms-4"><span class="badge border border-primary text-primary font-monospace">{{ llm_model }}</span></div>
+        <div><div class="fw-medium">Ollama model</div><div class="small text-muted mt-1">Set via OLLAMA_MODEL in docker-compose.yml</div></div>
+        <div class="flex-shrink-0 ms-4"><span class="badge border border-primary text-primary font-monospace">{{ ollama_model }}</span></div>
       </div>
       <div class="d-flex align-items-center justify-content-between py-3 px-4 setting-row">
-        <div><div class="fw-medium">LLM endpoint</div><div class="small text-muted mt-1">Set via LLM_BASE_URL in docker-compose.yml</div></div>
-        <div class="flex-shrink-0 ms-4"><span class="badge border border-primary text-primary font-monospace">{{ llm_endpoint }}</span></div>
+        <div><div class="fw-medium">Ollama host</div><div class="small text-muted mt-1">Set via OLLAMA_HOST in docker-compose.yml</div></div>
+        <div class="flex-shrink-0 ms-4"><span class="badge border border-primary text-primary font-monospace">{{ ollama_host }}</span></div>
       </div>
     </div>
   </div>
