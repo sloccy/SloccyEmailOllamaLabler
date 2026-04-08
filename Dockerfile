@@ -20,7 +20,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags="-s -w" -o /ollamail .
 
-FROM alpine:3.21
+FROM alpine:3.23
 
 RUN adduser -D -u 1000 -s /sbin/nologin appuser
 
