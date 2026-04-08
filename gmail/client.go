@@ -1,20 +1,22 @@
 package gmail
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"golang.org/x/oauth2"
-	"google.golang.org/api/gmail/v1"
-	"google.golang.org/api/option"
 )
 
 const (
@@ -22,6 +24,8 @@ const (
 	LabelUnread = "UNREAD"
 	LabelSpam   = "SPAM"
 	LabelTrash  = "TRASH"
+
+	gmailBase = "https://gmail.googleapis.com/gmail/v1/users/me"
 )
 
 // retryTransport wraps an http.RoundTripper with retry logic for 429 and 5xx.
@@ -52,9 +56,14 @@ func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
-// NewService creates an authenticated Gmail API service for the given stored credentials JSON.
+// Client is an authenticated Gmail REST client.
+type Client struct {
+	http *http.Client
+}
+
+// NewService creates an authenticated Gmail client for the given stored credentials JSON.
 // If the token is refreshed, onRefresh is called with the new token JSON.
-func NewService(ctx context.Context, credJSON string, oauthCfg *oauth2.Config, onRefresh func(string)) (*gmail.Service, error) {
+func NewService(ctx context.Context, credJSON string, oauthCfg *oauth2.Config, onRefresh func(string)) (*Client, error) {
 	token, err := TokenFromJSON(credJSON)
 	if err != nil {
 		return nil, fmt.Errorf("parse token: %w", err)
@@ -75,11 +84,7 @@ func NewService(ctx context.Context, credJSON string, oauthCfg *oauth2.Config, o
 		},
 	}
 
-	svc, err := gmail.NewService(ctx, option.WithHTTPClient(httpClient))
-	if err != nil {
-		return nil, err
-	}
-	return svc, nil
+	return &Client{http: httpClient}, nil
 }
 
 // refreshingTokenSource calls onRefresh when the token changes.
@@ -111,33 +116,128 @@ func marshalToken(t *oauth2.Token, fn func(string)) {
 	}
 }
 
-// ServiceWrapper holds a Gmail service and its underlying OAuth token source.
+// ServiceWrapper holds a Gmail client.
 type ServiceWrapper struct {
-	Svc *gmail.Service
+	Svc *Client
 }
 
-// Label is a Gmail label id/name pair.
+// --- local JSON types (only fields we use) ---
+
+type apiLabel struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type apiListLabelsResponse struct {
+	Labels []apiLabel `json:"labels"`
+}
+
+type apiMessageRef struct {
+	ID string `json:"id"`
+}
+
+type apiListMessagesResponse struct {
+	Messages      []apiMessageRef `json:"messages"`
+	NextPageToken string          `json:"nextPageToken"`
+}
+
+type apiMessagePartBody struct {
+	Data string `json:"data"`
+}
+
+type apiMessagePart struct {
+	MimeType string `json:"mimeType"`
+	Headers  []struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	} `json:"headers"`
+	Parts []apiMessagePart    `json:"parts"`
+	Body  *apiMessagePartBody `json:"body"`
+}
+
+type apiMessage struct {
+	ID      string          `json:"id"`
+	Snippet string          `json:"snippet"`
+	Payload *apiMessagePart `json:"payload"`
+}
+
+type apiBatchModifyRequest struct {
+	IDs            []string `json:"ids"`
+	AddLabelIds    []string `json:"addLabelIds"`
+	RemoveLabelIds []string `json:"removeLabelIds"`
+}
+
+// --- HTTP helpers ---
+
+func (c *Client) get(ctx context.Context, path string, params url.Values, out any) error {
+	u := gmailBase + path
+	if len(params) > 0 {
+		u += "?" + params.Encode()
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("gmail API %s: %s", path, body)
+	}
+	return json.NewDecoder(resp.Body).Decode(out)
+}
+
+func (c *Client) post(ctx context.Context, path string, in any, out any) error {
+	body, err := json.Marshal(in)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, gmailBase+path, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode >= 400 {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("gmail API %s: %s", path, b)
+	}
+	if out != nil {
+		return json.NewDecoder(resp.Body).Decode(out)
+	}
+	return nil
+}
+
+// --- Label is a Gmail label id/name pair ---
+
 type Label struct {
 	ID   string
 	Name string
 }
 
 // ListLabels returns all labels for the account, sorted by name.
-func ListLabels(ctx context.Context, svc *gmail.Service) ([]Label, error) {
-	res, err := svc.Users.Labels.List("me").Context(ctx).Do()
-	if err != nil {
+func ListLabels(ctx context.Context, svc *Client) ([]Label, error) {
+	var res apiListLabelsResponse
+	if err := svc.get(ctx, "/labels", nil, &res); err != nil {
 		return nil, err
 	}
 	labels := make([]Label, 0, len(res.Labels))
 	for _, l := range res.Labels {
-		labels = append(labels, Label{ID: l.Id, Name: l.Name})
+		labels = append(labels, Label(l))
 	}
 	sort.Slice(labels, func(i, j int) bool { return labels[i].Name < labels[j].Name })
 	return labels, nil
 }
 
 // BuildLabelCache returns a map of label name -> label ID, creating missing labels.
-func BuildLabelCache(ctx context.Context, svc *gmail.Service, needed []string) (map[string]string, error) {
+func BuildLabelCache(ctx context.Context, svc *Client, needed []string) (map[string]string, error) {
 	existing, err := ListLabels(ctx, svc)
 	if err != nil {
 		return nil, err
@@ -150,17 +250,17 @@ func BuildLabelCache(ctx context.Context, svc *gmail.Service, needed []string) (
 		if _, ok := cache[name]; ok {
 			continue
 		}
-		created, err := svc.Users.Labels.Create("me", &gmail.Label{Name: name}).Context(ctx).Do()
-		if err != nil {
+		var created apiLabel
+		if err := svc.post(ctx, "/labels", map[string]string{"name": name}, &created); err != nil {
 			return nil, fmt.Errorf("create label %q: %w", name, err)
 		}
-		cache[name] = created.Id
+		cache[name] = created.ID
 	}
 	return cache, nil
 }
 
 // EnsureLabel creates a label if it doesn't exist. Safe to call concurrently.
-func EnsureLabel(ctx context.Context, svc *gmail.Service, name string) error {
+func EnsureLabel(ctx context.Context, svc *Client, name string) error {
 	labels, err := ListLabels(ctx, svc)
 	if err != nil {
 		return err
@@ -170,32 +270,34 @@ func EnsureLabel(ctx context.Context, svc *gmail.Service, name string) error {
 			return nil
 		}
 	}
-	_, err = svc.Users.Labels.Create("me", &gmail.Label{Name: name}).Context(ctx).Do()
-	return err
+	return svc.post(ctx, "/labels", map[string]string{"name": name}, nil)
 }
 
 // ListRecentMessageIDs returns message IDs from the inbox for the last lookbackHours hours.
-func ListRecentMessageIDs(ctx context.Context, svc *gmail.Service, lookbackHours int, maxResults int64) ([]string, error) {
+func ListRecentMessageIDs(ctx context.Context, svc *Client, lookbackHours int, maxResults int64) ([]string, error) {
 	after := time.Now().UTC().Add(-time.Duration(lookbackHours) * time.Hour)
 	q := fmt.Sprintf("in:inbox after:%d", after.Unix())
 	return paginateMessageIDs(ctx, svc, q, maxResults, 0)
 }
 
-func paginateMessageIDs(ctx context.Context, svc *gmail.Service, q string, maxResults int64, maxPages int) ([]string, error) {
+func paginateMessageIDs(ctx context.Context, svc *Client, q string, maxResults int64, maxPages int) ([]string, error) {
 	var ids []string
 	var pageToken string
 	page := 0
 	for {
-		call := svc.Users.Messages.List("me").Q(q).MaxResults(maxResults).Context(ctx)
-		if pageToken != "" {
-			call = call.PageToken(pageToken)
+		params := url.Values{
+			"q":          {q},
+			"maxResults": {strconv.FormatInt(maxResults, 10)},
 		}
-		res, err := call.Do()
-		if err != nil {
+		if pageToken != "" {
+			params.Set("pageToken", pageToken)
+		}
+		var res apiListMessagesResponse
+		if err := svc.get(ctx, "/messages", params, &res); err != nil {
 			return nil, err
 		}
 		for _, m := range res.Messages {
-			ids = append(ids, m.Id)
+			ids = append(ids, m.ID)
 		}
 		pageToken = res.NextPageToken
 		page++
@@ -216,7 +318,7 @@ type Message struct {
 }
 
 // IterMessageDetails fetches full message details concurrently (up to 10 at a time).
-func IterMessageDetails(ctx context.Context, svc *gmail.Service, ids []string, maxBodyChars int) (<-chan Message, <-chan error) {
+func IterMessageDetails(ctx context.Context, svc *Client, ids []string, maxBodyChars int) (<-chan Message, <-chan error) {
 	msgCh := make(chan Message, len(ids))
 	errCh := make(chan error, 1)
 
@@ -259,35 +361,37 @@ func IterMessageDetails(ctx context.Context, svc *gmail.Service, ids []string, m
 	return msgCh, errCh
 }
 
-func fetchMessage(ctx context.Context, svc *gmail.Service, id string, maxBodyChars int) (Message, error) {
-	m, err := svc.Users.Messages.Get("me", id).Format("full").Context(ctx).Do()
-	if err != nil {
+func fetchMessage(ctx context.Context, svc *Client, id string, maxBodyChars int) (Message, error) {
+	var m apiMessage
+	if err := svc.get(ctx, "/messages/"+id, url.Values{"format": {"full"}}, &m); err != nil {
 		return Message{}, err
 	}
 	msg := Message{
 		ID:      id,
 		Snippet: m.Snippet,
 	}
-	for _, h := range m.Payload.Headers {
-		switch h.Name {
-		case "From":
-			msg.Sender = h.Value
-		case "Subject":
-			msg.Subject = h.Value
+	if m.Payload != nil {
+		for _, h := range m.Payload.Headers {
+			switch h.Name {
+			case "From":
+				msg.Sender = h.Value
+			case "Subject":
+				msg.Subject = h.Value
+			}
 		}
+		msg.Body = extractPayloadBody(m.Payload, maxBodyChars)
 	}
-	msg.Body = extractPayloadBody(m.Payload, maxBodyChars)
 	return msg, nil
 }
 
-func extractPayloadBody(payload *gmail.MessagePart, maxChars int) string {
+func extractPayloadBody(payload *apiMessagePart, maxChars int) string {
 	if payload == nil {
 		return ""
 	}
 	return truncate(extractBodyRecursive(payload, maxChars*10), maxChars)
 }
 
-func extractBodyRecursive(part *gmail.MessagePart, maxChars int) string {
+func extractBodyRecursive(part *apiMessagePart, maxChars int) string {
 	if part == nil {
 		return ""
 	}
@@ -315,14 +419,14 @@ func extractBodyRecursive(part *gmail.MessagePart, maxChars int) string {
 	// Prefer text/plain part
 	for _, p := range part.Parts {
 		if strings.Contains(strings.ToLower(p.MimeType), "plain") {
-			if t := extractBodyRecursive(p, maxChars); t != "" {
+			if t := extractBodyRecursive(&p, maxChars); t != "" {
 				return t
 			}
 		}
 	}
 	// Fallback to any part
 	for _, p := range part.Parts {
-		if t := extractBodyRecursive(p, maxChars); t != "" {
+		if t := extractBodyRecursive(&p, maxChars); t != "" {
 			return t
 		}
 	}
@@ -337,54 +441,54 @@ type Modify struct {
 }
 
 // BatchModifyEmails applies label changes, grouped by identical add/remove sets.
-func BatchModifyEmails(ctx context.Context, svc *gmail.Service, mods []Modify) error {
+func BatchModifyEmails(ctx context.Context, svc *Client, mods []Modify) error {
 	type key struct{ add, remove string }
-	grouped := make(map[key]*gmail.BatchModifyMessagesRequest)
+	grouped := make(map[key]*apiBatchModifyRequest)
 
 	for _, m := range mods {
 		add := strings.Join(m.AddLabels, ",")
 		remove := strings.Join(m.RemoveLabels, ",")
 		k := key{add, remove}
 		if _, ok := grouped[k]; !ok {
-			grouped[k] = &gmail.BatchModifyMessagesRequest{
+			grouped[k] = &apiBatchModifyRequest{
 				AddLabelIds:    m.AddLabels,
 				RemoveLabelIds: m.RemoveLabels,
 			}
 		}
-		grouped[k].Ids = append(grouped[k].Ids, m.MessageIDs...)
+		grouped[k].IDs = append(grouped[k].IDs, m.MessageIDs...)
 	}
 
 	for _, req := range grouped {
-		for len(req.Ids) > 0 {
-			batch := req.Ids
+		for len(req.IDs) > 0 {
+			batch := req.IDs
 			if len(batch) > 1000 {
 				batch = batch[:1000]
 			}
-			if err := svc.Users.Messages.BatchModify("me", &gmail.BatchModifyMessagesRequest{
-				Ids:            batch,
+			if err := svc.post(ctx, "/messages/batchModify", &apiBatchModifyRequest{
+				IDs:            batch,
 				AddLabelIds:    req.AddLabelIds,
 				RemoveLabelIds: req.RemoveLabelIds,
-			}).Context(ctx).Do(); err != nil {
+			}, nil); err != nil {
 				return err
 			}
-			req.Ids = req.Ids[len(batch):]
+			req.IDs = req.IDs[len(batch):]
 		}
 	}
 	return nil
 }
 
 // BatchTrashEmails moves messages to trash.
-func BatchTrashEmails(ctx context.Context, svc *gmail.Service, ids []string) error {
+func BatchTrashEmails(ctx context.Context, svc *Client, ids []string) error {
 	for len(ids) > 0 {
 		batch := ids
 		if len(batch) > 1000 {
 			batch = batch[:1000]
 		}
-		if err := svc.Users.Messages.BatchModify("me", &gmail.BatchModifyMessagesRequest{
-			Ids:            batch,
+		if err := svc.post(ctx, "/messages/batchModify", &apiBatchModifyRequest{
+			IDs:            batch,
 			AddLabelIds:    []string{LabelTrash},
 			RemoveLabelIds: []string{LabelInbox},
-		}).Context(ctx).Do(); err != nil {
+		}, nil); err != nil {
 			return err
 		}
 		ids = ids[len(batch):]
@@ -394,7 +498,7 @@ func BatchTrashEmails(ctx context.Context, svc *gmail.Service, ids []string) err
 
 // FetchEmailsOlderThan returns message IDs older than `days` days with the given label,
 // excluding any labels in excludeLabels.
-func FetchEmailsOlderThan(ctx context.Context, svc *gmail.Service, days int, label string, excludeLabels []string, maxPages int) ([]string, error) {
+func FetchEmailsOlderThan(ctx context.Context, svc *Client, days int, label string, excludeLabels []string, maxPages int) ([]string, error) {
 	before := time.Now().UTC().AddDate(0, 0, -days)
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "before:%s", before.Format("2006/01/02"))
