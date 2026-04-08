@@ -5,11 +5,13 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"embed"
 	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -23,6 +25,9 @@ import (
 	"github.com/sloccy/ollamail/llm"
 	"github.com/sloccy/ollamail/poller"
 )
+
+//go:embed static
+var staticFS embed.FS
 
 const retentionUnitYears = "years"
 
@@ -70,7 +75,8 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) registerRoutes() {
 	// Static
-	s.mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	staticSub, _ := fs.Sub(staticFS, "static")
+	s.mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticSub))))
 
 	// Index
 	s.mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
