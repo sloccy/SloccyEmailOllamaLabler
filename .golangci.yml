@@ -35,11 +35,10 @@ linters:
     - nilnil
     - prealloc
     - perfsprint
+  settings:
+    staticcheck:
+      checks: ["all", "-QF1008", "-ST1000"]
 
 formatters:
   enable:
     - gofmt
-
-settings:
-  staticcheck:
-    checks: ["all", "-QF1008"]
