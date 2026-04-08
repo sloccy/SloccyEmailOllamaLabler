@@ -25,7 +25,6 @@ FROM alpine:3.23
 RUN adduser -D -u 1000 -s /sbin/nologin appuser
 
 COPY --from=build /ollamail /ollamail
-COPY templates/ /templates/
 COPY static/ /static/
 COPY --from=assets /build/vendor/ /static/vendor/
 

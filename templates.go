@@ -1,11 +1,17 @@
 package main
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io/fs"
+	"path/filepath"
 	"time"
 )
+
+//go:embed templates
+var templateFS embed.FS
 
 // tmplFuncs returns the template FuncMap used by all templates.
 func tmplFuncs() template.FuncMap {
@@ -97,39 +103,25 @@ func toJSON(v any) template.JS {
 	return template.JS(b)
 }
 
-// loadTemplates parses all templates from disk.
+// loadTemplates parses all embedded templates.
 func loadTemplates() (*template.Template, error) {
 	t := template.New("").Funcs(tmplFuncs())
 
-	// Parse partials (defines action_checkboxes, etc.)
-	if _, err := t.ParseFiles("templates/partials.html"); err != nil {
-		return nil, fmt.Errorf("parse partials: %w", err)
-	}
-
-	// Parse all fragment files (both {{define}} blocks and standalone fragments).
-	fragmentFiles := []string{
-		"templates/fragments/logs_list.html",
-		"templates/fragments/prompt_card_view.html",
-		"templates/fragments/prompt_card_edit.html",
-		"templates/fragments/dashboard.html",
-		"templates/fragments/accounts_list.html",
-		"templates/fragments/prompts_list.html",
-		"templates/fragments/settings_form.html",
-		"templates/fragments/history_filters.html",
-		"templates/fragments/history_table.html",
-		"templates/fragments/retention_panel.html",
-		"templates/fragments/account_options.html",
-		"templates/fragments/oauth_step2.html",
-	}
-	for _, f := range fragmentFiles {
-		if _, err := t.ParseFiles(f); err != nil {
-			return nil, fmt.Errorf("parse %s: %w", f, err)
+	err := fs.WalkDir(templateFS, "templates", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
 		}
-	}
-
-	// Parse top-level page template
-	if _, err := t.ParseFiles("templates/index.html"); err != nil {
-		return nil, fmt.Errorf("parse index: %w", err)
+		data, readErr := templateFS.ReadFile(path)
+		if readErr != nil {
+			return fmt.Errorf("read %s: %w", path, readErr)
+		}
+		if _, parseErr := t.New(filepath.Base(path)).Parse(string(data)); parseErr != nil {
+			return fmt.Errorf("parse %s: %w", path, parseErr)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("load templates: %w", err)
 	}
 
 	return t, nil
