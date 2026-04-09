@@ -219,7 +219,7 @@ func (s *server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	nextScan := "--"
 	if status.NextRun != "" {
 		if t, err := time.Parse("2006-01-02 15:04:05", status.NextRun); err == nil {
-			nextScan = t.Local().Format("15:04:05")
+			nextScan = t.Format("15:04:05")
 		}
 	}
 
