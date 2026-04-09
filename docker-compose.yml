@@ -49,6 +49,7 @@ services:
       # How many emails to fetch per inbox scan (default: 50)
       # Only unprocessed emails are classified, so higher values are safe
       - GMAIL_MAX_RESULTS=10
+      - TZ=${TZ:-America/Denver}
 
     depends_on:
       - ollama

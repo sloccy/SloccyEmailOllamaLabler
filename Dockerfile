@@ -27,7 +27,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags="-s -w" -o
 
 FROM alpine:3.23
 
-RUN adduser -D -u 1000 -s /sbin/nologin appuser
+RUN apk add --no-cache tzdata && adduser -D -u 1000 -s /sbin/nologin appuser
 
 COPY --from=build /ollamail /ollamail
 
