@@ -4,7 +4,7 @@
   <p><strong>Local LLM email labeling for Gmail — fully self-hosted, no data leaves your machine.</strong></p>
   <img src="https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white" alt="Docker" />
   <img src="https://img.shields.io/badge/Ollama-powered-black?logo=llama&logoColor=white" alt="Ollama" />
-  <img src="https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white" alt="Python" />
+  <img src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white" alt="Go" />
 </div>
 
 ---
@@ -146,7 +146,7 @@ docker compose logs -f app
 
 ### 5. Open the web interface
 
-Navigate to **http://localhost:5001** (or your configured `BASE_URL`).
+Navigate to **http://localhost:5001**.
 
 | Page | Description |
 |---|---|
@@ -170,11 +170,11 @@ To run without Docker:
 git clone https://github.com/sloccy/OllaMail.git
 cd OllaMail
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Build frontend assets
+# Build frontend vendor assets (Bootstrap, htmx) and minify app.js / style.css
 npm install && npm run build
+
+# Build the binary (templates and static files are embedded at compile time)
+go build -o ollamail .
 
 # Set required environment variables
 export OLLAMA_HOST=http://localhost:11434
@@ -182,7 +182,7 @@ export DATA_DIR=./data
 export CREDENTIALS_FILE=./credentials/credentials.json
 
 # Run the app
-python -c "from app.server import create_app; create_app().run(host='0.0.0.0', port=5000, debug=True)"
+./ollamail
 ```
 
 You'll also need [Ollama](https://ollama.com) running locally and the model pulled:
@@ -203,7 +203,6 @@ All settings are controlled via environment variables.
 | `OLLAMA_MODEL` | `qwen3.5:4b-q4_K_M` | Model to use for classification |
 | `OLLAMA_TIMEOUT` | `600` | Seconds to wait for Ollama to respond or pull a model |
 | `OLLAMA_NUM_CTX` | `4096` | LLM context window size in tokens |
-| `OLLAMA_GENERATE_NUM_PREDICT` | `4096` | Max tokens for longer generation tasks (e.g. AI prompt builder) |
 | `GMAIL_MAX_RESULTS` | `50` | Emails fetched per inbox scan (only unprocessed ones are classified) |
 | `GMAIL_LOOKBACK_HOURS` | `24` | How far back to look for emails on each scan |
 | `EMAIL_BODY_TRUNCATION` | `3000` | Max characters of email body sent to the LLM |
@@ -222,7 +221,7 @@ All settings are controlled via environment variables.
 ```
 ┌─────────────┐     OAuth      ┌─────────────┐
 │   Gmail API │ ◄────────────► │  OllaMail   │
-└─────────────┘                │    (Flask)  │
+└─────────────┘                │     (Go)    │
                                └──────┬──────┘
                                       │ email body + all rules
                                ┌──────▼──────┐
@@ -261,10 +260,10 @@ All settings are controlled via environment variables.
 
 | Component | Technology |
 |---|---|
-| Backend | Python 3.14 / Flask 3 |
-| WSGI server | Waitress |
+| Backend | Go 1.26 |
+| HTTP server | net/http (stdlib) |
 | UI | Bootstrap 5.3 (dark mode) + HTMX 2.0 |
-| Database | SQLite via Peewee ORM |
+| Database | SQLite via modernc.org/sqlite + sqlc |
 | LLM runtime | Ollama |
-| Gmail integration | Google OAuth 2.0 + Gmail API |
+| Gmail integration | Google OAuth 2.0 + Gmail REST API |
 | Deployment | Docker / Docker Compose |
