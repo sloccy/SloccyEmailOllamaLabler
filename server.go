@@ -878,8 +878,9 @@ func (s *server) handleOAuthExchange(w http.ResponseWriter, r *http.Request) {
 // ============================================================
 
 func (s *server) handleScan(w http.ResponseWriter, _ *http.Request) {
+	s.store.Log("INFO", "Manual scan triggered")
 	s.poller.RunNow()
-	w.Header().Set("HX-Trigger", `{"showToast":"Scan triggered"}`)
+	w.Header().Set("HX-Trigger", `{"showToast":{"message":"Scan complete","type":"success"},"refreshDashboard":""}`)
 	w.WriteHeader(http.StatusOK)
 }
 

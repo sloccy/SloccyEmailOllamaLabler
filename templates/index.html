@@ -42,11 +42,11 @@
     <div class="page active" id="page-dashboard">
       <div class="d-flex align-items-center justify-content-between mb-4 pb-3 border-bottom">
         <div><h2 class="fw-bold mb-1">Dashboard</h2><div class="small text-muted">Overview of your email scanning setup</div></div>
-        <div><button class="btn btn-outline-info btn-sm" hx-post="/fragments/scan" hx-swap="none">&#9654; Scan Now</button></div>
+        <div><button class="btn btn-outline-info btn-sm" id="btn-scan-now" hx-post="/fragments/scan" hx-swap="none" hx-disabled-elt="this" hx-on::before-request="toast('Scan started\u2026','info')">&#9654; Scan Now</button></div>
       </div>
       <div id="dashboard-content"
         hx-get="/fragments/dashboard"
-        hx-trigger="load, every 30s [document.getElementById('page-dashboard').classList.contains('active')]"
+        hx-trigger="load, every 30s [document.getElementById('page-dashboard').classList.contains('active')], refreshDashboard from:body"
         hx-swap="innerHTML">
         <div class="d-flex flex-column gap-3 p-2">
           <div class="d-flex gap-3">

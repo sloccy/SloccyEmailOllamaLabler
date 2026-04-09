@@ -49,7 +49,7 @@ func parseTS(ts string) (time.Time, bool) {
 	if err != nil {
 		return time.Time{}, false
 	}
-	return t, true
+	return t.Local(), true
 }
 
 func fmtdate(ts string) string {

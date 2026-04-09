@@ -92,9 +92,9 @@ func (p *Poller) Stop() {
 	}
 }
 
-// RunNow triggers a scan immediately in a goroutine.
+// RunNow triggers a scan and blocks until it completes.
 func (p *Poller) RunNow() {
-	go p.runScan()
+	p.runScan()
 }
 
 // UpdateInterval changes the polling interval and reschedules the next run.
