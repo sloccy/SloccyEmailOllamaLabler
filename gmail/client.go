@@ -323,7 +323,7 @@ type Message struct {
 
 // IterMessageDetails fetches full message details concurrently (up to 10 at a time).
 func IterMessageDetails(ctx context.Context, svc *Client, ids []string, maxBodyChars int) (<-chan Message, <-chan error) {
-	msgCh := make(chan Message, len(ids))
+	msgCh := make(chan Message, 5)
 	errCh := make(chan error, 1)
 
 	go func() {
@@ -392,7 +392,7 @@ func extractPayloadBody(payload *apiMessagePart, maxChars int) string {
 	if payload == nil {
 		return ""
 	}
-	return Truncate(extractBodyRecursive(payload, maxChars*10), maxChars)
+	return Truncate(extractBodyRecursive(payload, maxChars*3), maxChars)
 }
 
 func extractBodyRecursive(part *apiMessagePart, maxChars int) string {

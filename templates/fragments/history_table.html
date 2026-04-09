@@ -22,10 +22,10 @@
         {{else}}
           <span class="badge text-bg-secondary">no match</span>
         {{end}}
-        {{if .LlmResponse}}
-        <details>
+        {{if .HasLlmResponse}}
+        <details hx-get="/fragments/history/{{.ID}}/llm-response" hx-trigger="toggle once" hx-target="find .llm-content" hx-swap="outerHTML">
           <summary class="text-muted" style="cursor:pointer;font-size:.75rem;list-style:none;">LLM</summary>
-          <pre class="mt-1 p-1 border rounded bg-body-secondary font-monospace" style="font-size:.7rem;max-width:100%;white-space:pre-wrap;word-break:break-all;">{{.LlmResponse}}</pre>
+          <span class="llm-content"></span>
         </details>
         {{end}}
       </div>

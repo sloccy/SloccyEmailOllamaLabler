@@ -147,6 +147,7 @@ func (s *server) registerRoutes() {
 	s.mux.HandleFunc("GET /fragments/logs", s.handleLogs)
 	s.mux.HandleFunc("GET /fragments/history", s.handleHistory)
 	s.mux.HandleFunc("GET /fragments/history/filters", s.handleHistoryFilters)
+	s.mux.HandleFunc("GET /fragments/history/{id}/llm-response", s.handleHistoryLlmResponse)
 	s.mux.HandleFunc("GET /fragments/retention/{id}", s.handleGetRetention)
 	s.mux.HandleFunc("POST /fragments/retention/{id}", s.handleSetGlobalRetention)
 	s.mux.HandleFunc("POST /fragments/retention/{id}/labels", s.handleAddLabelRetention)
@@ -560,14 +561,15 @@ func (s *server) handleLogs(w http.ResponseWriter, r *http.Request) {
 // ============================================================
 
 type historyRow struct {
-	Timestamp    string
-	AccountEmail string
-	Subject      string
-	Sender       string
-	PromptName   string
-	LabelName    string
-	ExtraActions []string
-	LlmResponse  string
+	ID             int64
+	Timestamp      string
+	AccountEmail   string
+	Subject        string
+	Sender         string
+	PromptName     string
+	LabelName      string
+	ExtraActions   []string
+	HasLlmResponse bool
 }
 
 func (s *server) handleHistory(w http.ResponseWriter, r *http.Request) {
@@ -601,13 +603,14 @@ func (s *server) handleHistory(w http.ResponseWriter, r *http.Request) {
 	views := make([]historyRow, len(rows))
 	for i, h := range rows {
 		views[i] = historyRow{
-			Timestamp:    h.Timestamp,
-			AccountEmail: h.AccountEmail,
-			Subject:      h.Subject,
-			Sender:       h.Sender,
-			PromptName:   h.PromptName.String,
-			LabelName:    h.LabelName.String,
-			LlmResponse:  h.LlmResponse,
+			ID:             h.ID,
+			Timestamp:      h.Timestamp,
+			AccountEmail:   h.AccountEmail,
+			Subject:        h.Subject,
+			Sender:         h.Sender,
+			PromptName:     h.PromptName.String,
+			LabelName:      h.LabelName.String,
+			HasLlmResponse: h.LlmResponse != "",
 		}
 		if h.Actions != "" {
 			views[i].ExtraActions = strings.Split(h.Actions, ",")
@@ -634,6 +637,23 @@ func (s *server) handleHistoryFilters(w http.ResponseWriter, r *http.Request) {
 		"Accounts": toAccountViews(accounts),
 		"Prompts":  options,
 	}, "")
+}
+
+func (s *server) handleHistoryLlmResponse(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	resp, err := s.store.GetHistoryLlmResponse(r.Context(), id)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprintf(w, `<pre class="mt-1 p-1 border rounded bg-body-secondary font-monospace" style="font-size:.7rem;max-width:100%%;white-space:pre-wrap;word-break:break-all;">%s</pre>`,
+		template.HTMLEscapeString(resp))
 }
 
 // ============================================================
@@ -822,7 +842,13 @@ func (s *server) buildRetentionDataWithGmail(ctx context.Context, accountID int6
 func (s *server) handleOAuthStart(w http.ResponseWriter, _ *http.Request) {
 	state := generateToken(16)
 	s.oauthMu.Lock()
-	s.oauthState[state] = time.Now().Add(10 * time.Minute)
+	now := time.Now()
+	for k, exp := range s.oauthState {
+		if now.After(exp) {
+			delete(s.oauthState, k)
+		}
+	}
+	s.oauthState[state] = now.Add(10 * time.Minute)
 	s.oauthMu.Unlock()
 
 	authURL, err := s.auth.GetAuthURL(state)

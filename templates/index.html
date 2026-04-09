@@ -46,7 +46,7 @@
       </div>
       <div id="dashboard-content"
         hx-get="/fragments/dashboard"
-        hx-trigger="load, every 30s [document.getElementById('page-dashboard').classList.contains('active')], refreshDashboard from:body"
+        hx-trigger="load, every 30s [document.getElementById('page-dashboard').classList.contains('active') &amp;&amp; document.visibilityState === 'visible'], refreshDashboard from:body"
         hx-swap="innerHTML">
         <div class="d-flex flex-column gap-3 p-2">
           <div class="d-flex gap-3">

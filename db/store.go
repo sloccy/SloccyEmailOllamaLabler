@@ -27,6 +27,12 @@ func Open(path string) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1) // SQLite WAL: single writer
+	// Reduce SQLite page cache from default ~2MB to 512KB and disable mmap
+	for _, pragma := range []string{"PRAGMA cache_size = -512", "PRAGMA mmap_size = 0"} {
+		if _, err := db.ExecContext(context.Background(), pragma); err != nil {
+			return nil, fmt.Errorf("sqlite pragma: %w", err)
+		}
+	}
 	if err := db.PingContext(context.Background()); err != nil {
 		return nil, err
 	}
@@ -261,8 +267,10 @@ type HistoryFilter struct {
 }
 
 func (s *Store) GetHistoryFiltered(ctx context.Context, f HistoryFilter) ([]CategorizationHistory, error) {
+	// Omit llm_response from list query; use HasLlmResponse to indicate availability.
+	// Full response is fetched on demand via GetHistoryLlmResponse.
 	query := `SELECT id, timestamp, account_id, account_email, message_id, subject, sender,
-		prompt_id, prompt_name, label_name, actions, llm_response
+		prompt_id, prompt_name, label_name, actions, (llm_response != '') AS has_llm_response
 		FROM categorization_history WHERE 1=1`
 	args := []any{}
 
@@ -296,13 +304,17 @@ func (s *Store) GetHistoryFiltered(ctx context.Context, f HistoryFilter) ([]Cate
 	var results []CategorizationHistory
 	for rows.Next() {
 		var r CategorizationHistory
+		var hasLlm bool
 		if err := rows.Scan(
 			&r.ID, &r.Timestamp, &r.AccountID, &r.AccountEmail,
 			&r.MessageID, &r.Subject, &r.Sender,
 			&r.PromptID, &r.PromptName, &r.LabelName,
-			&r.Actions, &r.LlmResponse,
+			&r.Actions, &hasLlm,
 		); err != nil {
 			return nil, err
+		}
+		if hasLlm {
+			r.LlmResponse = "1" // sentinel: response exists, not yet loaded
 		}
 		results = append(results, r)
 	}
@@ -310,6 +322,13 @@ func (s *Store) GetHistoryFiltered(ctx context.Context, f HistoryFilter) ([]Cate
 		return nil, err
 	}
 	return results, nil
+}
+
+// GetHistoryLlmResponse fetches only the llm_response text for a single history row.
+func (s *Store) GetHistoryLlmResponse(ctx context.Context, id int64) (string, error) {
+	var resp string
+	err := s.db.QueryRowContext(ctx, `SELECT llm_response FROM categorization_history WHERE id = ?`, id).Scan(&resp)
+	return resp, err
 }
 
 // ============================================================

@@ -7,6 +7,7 @@ import (
 // extractText strips HTML tags from src and returns plain text.
 // It skips content inside <script> and <style> elements.
 func extractText(src string) string {
+	srcLower := strings.ToLower(src)
 	var sb strings.Builder
 	inTag := false
 	inScript := false
@@ -17,8 +18,8 @@ func extractText(src string) string {
 		if !inTag && !inScript && !inStyle {
 			if src[i] == '<' {
 				inTag = true
-				// Peek at tag name (lowercase only the short prefix needed)
-				peek := strings.ToLower(src[i:min(i+8, len(src))])
+				// Peek at tag name using pre-lowercased copy
+				peek := srcLower[i:min(i+8, len(src))]
 				if strings.HasPrefix(peek, "<script") {
 					inScript = true
 				} else if strings.HasPrefix(peek, "<style") {
@@ -33,7 +34,7 @@ func extractText(src string) string {
 		}
 
 		if inScript {
-			if idx := strings.Index(strings.ToLower(src[i:]), "</script>"); idx >= 0 {
+			if idx := strings.Index(srcLower[i:], "</script>"); idx >= 0 {
 				i += idx + len("</script>")
 				inScript = false
 				inTag = false
@@ -44,7 +45,7 @@ func extractText(src string) string {
 		}
 
 		if inStyle {
-			if idx := strings.Index(strings.ToLower(src[i:]), "</style>"); idx >= 0 {
+			if idx := strings.Index(srcLower[i:], "</style>"); idx >= 0 {
 				i += idx + len("</style>")
 				inStyle = false
 				inTag = false
