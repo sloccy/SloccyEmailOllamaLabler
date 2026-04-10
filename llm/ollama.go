@@ -145,7 +145,10 @@ func (c *Client) ClassifyEmailBatch(ctx context.Context, store *db.Store, email 
 		},
 	}
 
-	requestBytes, _ := json.MarshalIndent(payload, "", "  ")
+	requestBytes, err := json.Marshal(payload)
+	if err != nil {
+		requestBytes = []byte("{}")
+	}
 	requestJSON := string(requestBytes)
 
 	subject := email.Subject

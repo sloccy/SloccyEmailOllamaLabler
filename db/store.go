@@ -558,16 +558,7 @@ type LlmDebugEntry struct {
 }
 
 func (s *Store) RecordLlmDebug(ctx context.Context, e LlmDebugEntry) error {
-	if err := s.AddLlmDebug(ctx, AddLlmDebugParams{
-		AccountID:    e.AccountID,
-		AccountEmail: e.AccountEmail,
-		MessageID:    e.MessageID,
-		Subject:      e.Subject,
-		Sender:       e.Sender,
-		GmailRaw:     e.GmailRaw,
-		LlmRequest:   e.LlmRequest,
-		LlmResponse:  e.LlmResponse,
-	}); err != nil {
+	if err := s.AddLlmDebug(ctx, AddLlmDebugParams(e)); err != nil {
 		return err
 	}
 	return s.TrimLlmDebug(ctx)

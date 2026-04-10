@@ -139,7 +139,10 @@ func processEmail(
 	store.Log("INFO", fmt.Sprintf("[%s] Classifying: '%s' from %s",
 		account.Email, gmailpkg.Truncate(msg.Subject, 60), gmailpkg.Truncate(msg.Sender, 60)))
 
-	gmailRawBytes, _ := json.MarshalIndent(msg, "", "  ")
+	gmailRawBytes, err := json.MarshalIndent(msg, "", "  ")
+	if err != nil {
+		gmailRawBytes = []byte("{}")
+	}
 	gmailRaw := string(gmailRawBytes)
 
 	results, requestJSON, rawResponse, llmErr := ollamaClient.ClassifyEmailBatch(ctx, store, email, llmPrompts)
