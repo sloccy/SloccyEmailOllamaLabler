@@ -3,6 +3,7 @@ package processor
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -138,7 +139,10 @@ func processEmail(
 	store.Log("INFO", fmt.Sprintf("[%s] Classifying: '%s' from %s",
 		account.Email, gmailpkg.Truncate(msg.Subject, 60), gmailpkg.Truncate(msg.Sender, 60)))
 
-	results, rawResponse, llmErr := ollamaClient.ClassifyEmailBatch(ctx, store, email, llmPrompts)
+	gmailRawBytes, _ := json.MarshalIndent(msg, "", "  ")
+	gmailRaw := string(gmailRawBytes)
+
+	results, requestJSON, rawResponse, llmErr := ollamaClient.ClassifyEmailBatch(ctx, store, email, llmPrompts)
 
 	var logs []db.LogEntry
 	var history []db.HistoryEntry
@@ -254,6 +258,19 @@ func processEmail(
 	if err := store.BatchInsertProcessingResults(ctx, logs, history, account.ID, msg.ID); err != nil {
 		slog.Error("db write failed", "err", err)
 		// Don't return error — email is processed, don't retry
+	}
+
+	if err := store.RecordLlmDebug(ctx, db.LlmDebugEntry{
+		AccountID:    account.ID,
+		AccountEmail: account.Email,
+		MessageID:    msg.ID,
+		Subject:      msg.Subject,
+		Sender:       msg.Sender,
+		GmailRaw:     gmailRaw,
+		LlmRequest:   requestJSON,
+		LlmResponse:  rawResponse,
+	}); err != nil {
+		slog.Error("llm debug write failed", "err", err)
 	}
 
 	return modifies, trashIDs

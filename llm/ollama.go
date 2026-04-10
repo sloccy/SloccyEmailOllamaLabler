@@ -115,9 +115,9 @@ type Error struct{ Msg string }
 
 func (e *Error) Error() string { return e.Msg }
 
-func (c *Client) ClassifyEmailBatch(ctx context.Context, store *db.Store, email Email, prompts []Prompt) (map[int64]bool, string, error) {
+func (c *Client) ClassifyEmailBatch(ctx context.Context, store *db.Store, email Email, prompts []Prompt) (map[int64]bool, string, string, error) {
 	if len(prompts) == 0 {
-		return nil, "", nil
+		return nil, "", "", nil
 	}
 
 	body := buildBody(email, prompts)
@@ -145,6 +145,9 @@ func (c *Client) ClassifyEmailBatch(ctx context.Context, store *db.Store, email 
 		},
 	}
 
+	requestBytes, _ := json.MarshalIndent(payload, "", "  ")
+	requestJSON := string(requestBytes)
+
 	subject := email.Subject
 	if len(subject) > 60 {
 		subject = subject[:60]
@@ -154,7 +157,7 @@ func (c *Client) ClassifyEmailBatch(ctx context.Context, store *db.Store, email 
 	raw, err := c.doChat(ctx, payload)
 	if err != nil {
 		store.Log("ERROR", fmt.Sprintf("LLM request failed: %v", err))
-		return nil, "", &Error{Msg: fmt.Sprintf("LLM request failed: %v", err)}
+		return nil, requestJSON, "", &Error{Msg: fmt.Sprintf("LLM request failed: %v", err)}
 	}
 
 	store.Log("INFO", fmt.Sprintf("LLM classify response: content=%d chars", len(raw)))
@@ -172,7 +175,7 @@ func (c *Client) ClassifyEmailBatch(ctx context.Context, store *db.Store, email 
 	var result map[string]any
 	if err := json.Unmarshal([]byte(raw), &result); err != nil {
 		store.Log("ERROR", fmt.Sprintf("LLM parse error: %v | raw: %s", err, raw))
-		return nil, rawResponse, &Error{Msg: fmt.Sprintf("LLM parse error: %v", err)}
+		return nil, requestJSON, rawResponse, &Error{Msg: fmt.Sprintf("LLM parse error: %v", err)}
 	}
 
 	parsed := make(map[int64]bool, len(prompts))
@@ -187,7 +190,7 @@ func (c *Client) ClassifyEmailBatch(ctx context.Context, store *db.Store, email 
 			parsed[prompts[idx].ID] = b
 		}
 	}
-	return parsed, rawResponse, nil
+	return parsed, requestJSON, rawResponse, nil
 }
 
 func buildBody(email Email, prompts []Prompt) string {

@@ -27,6 +27,7 @@
         <li><a data-page="logs" href="#logs"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4h10M3 8h10M3 12h6" stroke-linecap="round"/></svg></span> Logs</a></li>
         <li><a data-page="history" href="#history"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2.5 1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span> History</a></li>
         <li><a data-page="retention" href="#retention"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="3" rx="1"/><path d="M3 6v7h10V6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 9.5h4" stroke-linecap="round"/></svg></span> Retention</a></li>
+        <li><a data-page="troubleshooting" href="#troubleshooting"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3" stroke-linecap="round"/><circle cx="8" cy="11" r="0.75" fill="currentColor" stroke="none"/></svg></span> Troubleshooting</a></li>
       </ul>
     </nav>
     <div class="sidebar-footer mt-auto pt-3 border-top">
@@ -347,6 +348,16 @@
         </div>
       </div>
       <div id="suggestion-detail-container" class="mt-4"></div>
+    </div>
+
+    <!-- Troubleshooting -->
+    <div class="page" id="page-troubleshooting">
+      <div class="d-flex align-items-center justify-content-between mb-4 pb-3 border-bottom">
+        <div><h2 class="fw-bold mb-1">Troubleshooting</h2><div class="small text-muted">Last 5 processed emails — Gmail data, LLM request, and LLM response</div></div>
+      </div>
+      <div hx-get="/fragments/troubleshooting" hx-trigger="intersect once" hx-swap="innerHTML">
+        <div class="skeleton rounded-3" style="height:200px"></div>
+      </div>
     </div>
 
   </main>

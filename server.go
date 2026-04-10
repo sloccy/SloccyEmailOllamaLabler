@@ -147,6 +147,7 @@ func (s *server) registerRoutes() {
 	s.mux.HandleFunc("PATCH /fragments/settings", s.handleUpdateSettings)
 	s.mux.HandleFunc("GET /fragments/logs", s.handleLogs)
 	s.mux.HandleFunc("GET /fragments/history", s.handleHistory)
+	s.mux.HandleFunc("GET /fragments/troubleshooting", s.handleTroubleshooting)
 	s.mux.HandleFunc("GET /fragments/history/filters", s.handleHistoryFilters)
 	s.mux.HandleFunc("GET /fragments/history/{id}/llm-response", s.handleHistoryLlmResponse)
 	s.mux.HandleFunc("GET /fragments/history/{id}/recategorize", s.handleRecategorizeForm)
@@ -625,6 +626,16 @@ func (s *server) handleHistory(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.fragmentResponse(w, "templates/fragments/history_table.html", views, "")
+}
+
+func (s *server) handleTroubleshooting(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	rows, err := s.store.GetLatestLlmDebug(ctx)
+	if err != nil {
+		slog.Error("troubleshooting query", "err", err)
+		rows = nil
+	}
+	s.fragmentResponse(w, "templates/fragments/troubleshooting_list.html", rows, "")
 }
 
 func (s *server) handleHistoryFilters(w http.ResponseWriter, r *http.Request) {

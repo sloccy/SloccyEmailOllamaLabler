@@ -367,6 +367,25 @@ UPDATE prompts SET instructions = ? WHERE id = ?;
 -- Schema version
 -- ============================================================
 
+-- ============================================================
+-- LLM Debug
+-- ============================================================
+
+-- name: AddLlmDebug :exec
+INSERT INTO llm_debug (account_id, account_email, message_id, subject, sender, gmail_raw, llm_request, llm_response)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: GetLatestLlmDebug :many
+SELECT id, timestamp, account_id, account_email, message_id, subject, sender, gmail_raw, llm_request, llm_response
+FROM llm_debug ORDER BY id DESC LIMIT 5;
+
+-- name: TrimLlmDebug :exec
+DELETE FROM llm_debug WHERE id NOT IN (SELECT id FROM llm_debug ORDER BY id DESC LIMIT 5);
+
+-- ============================================================
+-- Schema version
+-- ============================================================
+
 -- name: GetSchemaVersion :one
 SELECT version FROM schema_version LIMIT 1;
 

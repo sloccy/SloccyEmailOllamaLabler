@@ -107,6 +107,19 @@ CREATE TABLE IF NOT EXISTS prompt_suggestions (
     status                TEXT NOT NULL DEFAULT 'pending'
 );
 
+CREATE TABLE IF NOT EXISTS llm_debug (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now')),
+    account_id    INTEGER NOT NULL,
+    account_email TEXT NOT NULL DEFAULT '',
+    message_id    TEXT NOT NULL DEFAULT '',
+    subject       TEXT NOT NULL DEFAULT '',
+    sender        TEXT NOT NULL DEFAULT '',
+    gmail_raw     TEXT NOT NULL DEFAULT '',
+    llm_request   TEXT NOT NULL DEFAULT '',
+    llm_response  TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS schema_version (
     version INTEGER NOT NULL DEFAULT 0
 );

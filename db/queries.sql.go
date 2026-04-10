@@ -80,6 +80,44 @@ func (q *Queries) AddLabelRetention(ctx context.Context, arg AddLabelRetentionPa
 	return err
 }
 
+const addLlmDebug = `-- name: AddLlmDebug :exec
+
+
+INSERT INTO llm_debug (account_id, account_email, message_id, subject, sender, gmail_raw, llm_request, llm_response)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+`
+
+type AddLlmDebugParams struct {
+	AccountID    int64
+	AccountEmail string
+	MessageID    string
+	Subject      string
+	Sender       string
+	GmailRaw     string
+	LlmRequest   string
+	LlmResponse  string
+}
+
+// ============================================================
+// Schema version
+// ============================================================
+// ============================================================
+// LLM Debug
+// ============================================================
+func (q *Queries) AddLlmDebug(ctx context.Context, arg AddLlmDebugParams) error {
+	_, err := q.db.ExecContext(ctx, addLlmDebug,
+		arg.AccountID,
+		arg.AccountEmail,
+		arg.MessageID,
+		arg.Subject,
+		arg.Sender,
+		arg.GmailRaw,
+		arg.LlmRequest,
+		arg.LlmResponse,
+	)
+	return err
+}
+
 const addLog = `-- name: AddLog :exec
 
 INSERT INTO logs (level, message) VALUES (?, ?)
@@ -676,6 +714,45 @@ func (q *Queries) GetLatestCorrectionForMessage(ctx context.Context, messageID s
 		&i.Note,
 	)
 	return i, err
+}
+
+const getLatestLlmDebug = `-- name: GetLatestLlmDebug :many
+SELECT id, timestamp, account_id, account_email, message_id, subject, sender, gmail_raw, llm_request, llm_response
+FROM llm_debug ORDER BY id DESC LIMIT 5
+`
+
+func (q *Queries) GetLatestLlmDebug(ctx context.Context) ([]LlmDebug, error) {
+	rows, err := q.db.QueryContext(ctx, getLatestLlmDebug)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LlmDebug
+	for rows.Next() {
+		var i LlmDebug
+		if err := rows.Scan(
+			&i.ID,
+			&i.Timestamp,
+			&i.AccountID,
+			&i.AccountEmail,
+			&i.MessageID,
+			&i.Subject,
+			&i.Sender,
+			&i.GmailRaw,
+			&i.LlmRequest,
+			&i.LlmResponse,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getLogs = `-- name: GetLogs :many
@@ -1465,6 +1542,15 @@ DELETE FROM categorization_history WHERE timestamp < ?
 
 func (q *Queries) TrimHistory(ctx context.Context, timestamp string) error {
 	_, err := q.db.ExecContext(ctx, trimHistory, timestamp)
+	return err
+}
+
+const trimLlmDebug = `-- name: TrimLlmDebug :exec
+DELETE FROM llm_debug WHERE id NOT IN (SELECT id FROM llm_debug ORDER BY id DESC LIMIT 5)
+`
+
+func (q *Queries) TrimLlmDebug(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, trimLlmDebug)
 	return err
 }
 

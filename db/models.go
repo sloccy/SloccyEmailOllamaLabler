@@ -61,6 +61,19 @@ type LabelRetention struct {
 	Days      int64
 }
 
+type LlmDebug struct {
+	ID           int64
+	Timestamp    string
+	AccountID    int64
+	AccountEmail string
+	MessageID    string
+	Subject      string
+	Sender       string
+	GmailRaw     string
+	LlmRequest   string
+	LlmResponse  string
+}
+
 type Log struct {
 	ID        int64
 	Timestamp string

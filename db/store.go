@@ -75,6 +75,7 @@ func (s *Store) Migrate() error {
 	migrations := []func(context.Context) error{
 		s.migration001,
 		s.migration002,
+		s.migration003,
 	}
 
 	for i, m := range migrations {
@@ -144,6 +145,23 @@ func (s *Store) migration002(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// migration003 adds the llm_debug table for troubleshooting diagnostics.
+func (s *Store) migration003(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS llm_debug (
+		id            INTEGER PRIMARY KEY AUTOINCREMENT,
+		timestamp     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+		account_id    INTEGER NOT NULL,
+		account_email TEXT NOT NULL DEFAULT '',
+		message_id    TEXT NOT NULL DEFAULT '',
+		subject       TEXT NOT NULL DEFAULT '',
+		sender        TEXT NOT NULL DEFAULT '',
+		gmail_raw     TEXT NOT NULL DEFAULT '',
+		llm_request   TEXT NOT NULL DEFAULT '',
+		llm_response  TEXT NOT NULL DEFAULT ''
+	)`)
+	return err
 }
 
 func isSQLiteAlreadyExists(err error) bool {
@@ -522,6 +540,37 @@ func (s *Store) RewriteHistoryForMessage(ctx context.Context, messageID string, 
 	}
 
 	return tx.Commit()
+}
+
+// ============================================================
+// LLM Debug helpers
+// ============================================================
+
+type LlmDebugEntry struct {
+	AccountID    int64
+	AccountEmail string
+	MessageID    string
+	Subject      string
+	Sender       string
+	GmailRaw     string
+	LlmRequest   string
+	LlmResponse  string
+}
+
+func (s *Store) RecordLlmDebug(ctx context.Context, e LlmDebugEntry) error {
+	if err := s.AddLlmDebug(ctx, AddLlmDebugParams{
+		AccountID:    e.AccountID,
+		AccountEmail: e.AccountEmail,
+		MessageID:    e.MessageID,
+		Subject:      e.Subject,
+		Sender:       e.Sender,
+		GmailRaw:     e.GmailRaw,
+		LlmRequest:   e.LlmRequest,
+		LlmResponse:  e.LlmResponse,
+	}); err != nil {
+		return err
+	}
+	return s.TrimLlmDebug(ctx)
 }
 
 // ============================================================
