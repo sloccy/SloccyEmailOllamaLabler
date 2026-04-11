@@ -203,7 +203,7 @@ func (s *server) fragmentResponse(w http.ResponseWriter, path string, data any, 
 	if toast != "" {
 		triggers := map[string]any{"showToast": toast}
 		if b, err := json.Marshal(triggers); err == nil {
-			w.Header().Set("HX-Trigger", string(b))
+			w.Header().Set("Hx-Trigger", string(b))
 		}
 	}
 	s.renderFragmentFile(w, path, data)
@@ -925,7 +925,7 @@ func (s *server) handleOAuthExchange(w http.ResponseWriter, r *http.Request) {
 func (s *server) handleScan(w http.ResponseWriter, _ *http.Request) {
 	s.store.Log("INFO", "Manual scan triggered")
 	s.poller.RunNow()
-	w.Header().Set("HX-Trigger", `{"showToast":{"message":"Scan complete","type":"success"},"refreshDashboard":""}`)
+	w.Header().Set("Hx-Trigger", `{"showToast":{"message":"Scan complete","type":"success"},"refreshDashboard":""}`)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -1463,7 +1463,7 @@ func (s *server) handleRecategorize(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("HX-Trigger", `{"showToast":{"message":"Recategorization applied","type":"success"},"closeModal":"recategorize-modal","refreshSuggestionBadge":"1","refreshHistory":"1","refreshSuggestions":"1"}`)
+	w.Header().Set("Hx-Trigger", `{"showToast":{"message":"Recategorization applied","type":"success"},"closeModal":"recategorize-modal","refreshSuggestionBadge":"1","refreshHistory":"1","refreshSuggestions":"1"}`)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 }
 
