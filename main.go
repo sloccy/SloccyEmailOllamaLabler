@@ -66,12 +66,15 @@ func main() {
 	gmailAuth := gmail.NewAuth(cfg.CredentialsFile)
 
 	// Seed the Troubleshooting debug table with the 3 most recent processed
-	// emails when the table is empty. Re-fetches gmail data and rebuilds the
-	// LLM request locally; no LLM call is made.
-	if err := processor.BackfillLlmDebug(context.Background(), store, ollamaClient, gmailAuth,
-		processor.ProcessConfig{BodyTruncation: cfg.EmailBodyTrunc}); err != nil {
-		slog.Warn("llm debug backfill failed", "err", err)
-	}
+	// emails when the table is empty. Delayed 10s to allow Gmail auth to be
+	// ready before fetching.
+	go func() {
+		time.Sleep(10 * time.Second)
+		if err := processor.BackfillLlmDebug(context.Background(), store, ollamaClient, gmailAuth,
+			processor.ProcessConfig{BodyTruncation: cfg.EmailBodyTrunc}); err != nil {
+			slog.Warn("llm debug backfill failed", "err", err)
+		}
+	}()
 
 	// Poller
 	p := poller.New(store, ollamaClient, gmailAuth, &poller.Config{
