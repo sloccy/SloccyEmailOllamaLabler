@@ -1,6 +1,7 @@
 package gmail
 
 import (
+	"html"
 	"strings"
 )
 
@@ -62,8 +63,11 @@ func extractText(src string) string {
 		i++
 	}
 
-	// Collapse whitespace lines
-	lines := strings.Split(sb.String(), "\n")
+	// Decode HTML entities, then strip invisible/zero-width characters.
+	cleaned := cleanInvisibles(html.UnescapeString(sb.String()))
+
+	// Collapse whitespace lines (some may be empty after invisible-char removal).
+	lines := strings.Split(cleaned, "\n")
 	var out []string
 	for _, l := range lines {
 		t := strings.TrimSpace(l)
@@ -72,6 +76,35 @@ func extractText(src string) string {
 		}
 	}
 	return strings.Join(out, "\n")
+}
+
+// cleanInvisibles removes zero-width, formatting, and BOM code points that
+// marketing emails commonly inject as tracking padding or preheader spacers.
+func cleanInvisibles(s string) string {
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r == '\n' || r == '\t':
+			return r
+		case r < 0x20: // C0 controls (except \t above)
+			return -1
+		case r == 0x00AD: // SOFT HYPHEN
+			return -1
+		case r == 0x034F: // COMBINING GRAPHEME JOINER
+			return -1
+		case r == 0x200B || r == 0x200C || r == 0x200D: // ZWSP, ZWNJ, ZWJ
+			return -1
+		case r == 0x2060: // WORD JOINER
+			return -1
+		case r == 0xFEFF: // BOM / ZERO WIDTH NO-BREAK SPACE
+			return -1
+		case r >= 0x202A && r <= 0x202E: // bidi embedding/override controls
+			return -1
+		case r >= 0x2066 && r <= 0x2069: // bidi isolate controls
+			return -1
+		default:
+			return r
+		}
+	}, s)
 }
 
 // Truncate returns s truncated to maxChars bytes.

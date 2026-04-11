@@ -124,10 +124,6 @@ func (c *Client) buildClassifyPayload(email Email, prompts []Prompt) map[string]
 	return map[string]any{
 		"model": c.model,
 		"messages": []map[string]string{
-			{
-				"role":    "system",
-				"content": "You are an email classification assistant. Respond only with a JSON object mapping rule numbers to true/false. No explanation, no markdown.",
-			},
 			{"role": "user", "content": body},
 		},
 		"think":  false,
