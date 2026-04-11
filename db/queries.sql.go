@@ -1554,6 +1554,15 @@ func (q *Queries) TrimLlmDebug(ctx context.Context) error {
 	return err
 }
 
+const deleteIncompleteLlmDebug = `-- name: DeleteIncompleteLlmDebug :exec
+DELETE FROM llm_debug WHERE gmail_raw = '' OR llm_request = ''
+`
+
+func (q *Queries) DeleteIncompleteLlmDebug(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, deleteIncompleteLlmDebug)
+	return err
+}
+
 const trimLogs = `-- name: TrimLogs :exec
 DELETE FROM logs WHERE timestamp < ?
 `

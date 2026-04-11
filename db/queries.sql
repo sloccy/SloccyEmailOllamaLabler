@@ -382,6 +382,9 @@ FROM llm_debug ORDER BY id DESC LIMIT 3;
 -- name: TrimLlmDebug :exec
 DELETE FROM llm_debug WHERE id NOT IN (SELECT id FROM llm_debug ORDER BY id DESC LIMIT 3);
 
+-- name: DeleteIncompleteLlmDebug :exec
+DELETE FROM llm_debug WHERE gmail_raw = '' OR llm_request = '';
+
 -- ============================================================
 -- Schema version
 -- ============================================================

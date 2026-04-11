@@ -16,6 +16,13 @@ import (
 // taken from categorization_history. If the table already has any rows, this is
 // a no-op.
 func BackfillLlmDebug(ctx context.Context, store *db.Store, ollamaClient *llm.Client, gmailAuth *gmailpkg.Auth, cfg ProcessConfig) error {
+	// Remove any previously-inserted rows that are missing gmail_raw or
+	// llm_request (e.g. from a prior boot where the Gmail fetch failed).
+	// This lets the backfill retry rather than being stuck forever.
+	if err := store.DeleteIncompleteLlmDebug(ctx); err != nil {
+		slog.Warn("backfill: purge incomplete rows", "err", err)
+	}
+
 	existing, err := store.GetLatestLlmDebug(ctx)
 	if err != nil {
 		return err
@@ -105,6 +112,11 @@ func BackfillLlmDebug(ctx context.Context, store *db.Store, ollamaClient *llm.Cl
 					llmRequest = ollamaClient.BuildClassifyRequestJSON(email, entry.prompts)
 				}
 			}
+		}
+
+		if gmailRaw == "" || llmRequest == "" {
+			slog.Warn("backfill: skipping incomplete row", "message_id", h.MessageID)
+			continue
 		}
 
 		if err := store.AddLlmDebug(ctx, db.AddLlmDebugParams{
