@@ -317,11 +317,11 @@ func paginateMessageIDs(ctx context.Context, svc *Client, q string, maxResults i
 
 // Message is a simplified view of a Gmail message.
 type Message struct {
-	ID      string
-	Sender  string
-	Subject string
-	Body    string
-	Snippet string
+	ID      string `json:"id"`
+	Sender  string `json:"sender"`
+	Subject string `json:"subject"`
+	Body    string `json:"body"`
+	Snippet string `json:"snippet"`
 }
 
 // IterMessageDetails fetches full message details concurrently (up to 10 at a time).
