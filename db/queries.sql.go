@@ -718,7 +718,7 @@ func (q *Queries) GetLatestCorrectionForMessage(ctx context.Context, messageID s
 
 const getLatestLlmDebug = `-- name: GetLatestLlmDebug :many
 SELECT id, timestamp, account_id, account_email, message_id, subject, sender, gmail_raw, llm_request, llm_response
-FROM llm_debug ORDER BY id DESC LIMIT 5
+FROM llm_debug ORDER BY id DESC LIMIT 3
 `
 
 func (q *Queries) GetLatestLlmDebug(ctx context.Context) ([]LlmDebug, error) {
@@ -1546,7 +1546,7 @@ func (q *Queries) TrimHistory(ctx context.Context, timestamp string) error {
 }
 
 const trimLlmDebug = `-- name: TrimLlmDebug :exec
-DELETE FROM llm_debug WHERE id NOT IN (SELECT id FROM llm_debug ORDER BY id DESC LIMIT 5)
+DELETE FROM llm_debug WHERE id NOT IN (SELECT id FROM llm_debug ORDER BY id DESC LIMIT 3)
 `
 
 func (q *Queries) TrimLlmDebug(ctx context.Context) error {

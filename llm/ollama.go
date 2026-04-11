@@ -115,18 +115,14 @@ type Error struct{ Msg string }
 
 func (e *Error) Error() string { return e.Msg }
 
-func (c *Client) ClassifyEmailBatch(ctx context.Context, store *db.Store, email Email, prompts []Prompt) (map[int64]bool, string, string, error) {
-	if len(prompts) == 0 {
-		return nil, "", "", nil
-	}
-
+// buildClassifyPayload constructs the Ollama request payload for email classification.
+func (c *Client) buildClassifyPayload(email Email, prompts []Prompt) map[string]any {
 	body := buildBody(email, prompts)
 	numPredict := 50
 	if n := len(prompts) * 20; n > numPredict {
 		numPredict = n
 	}
-
-	payload := map[string]any{
+	return map[string]any{
 		"model": c.model,
 		"messages": []map[string]string{
 			{
@@ -144,6 +140,28 @@ func (c *Client) ClassifyEmailBatch(ctx context.Context, store *db.Store, email 
 			"num_ctx":     c.numCtx,
 		},
 	}
+}
+
+// BuildClassifyRequestJSON returns the JSON payload that would be sent to Ollama
+// for the given email and prompts. No network call is made. Returns an empty
+// string if prompts is empty.
+func (c *Client) BuildClassifyRequestJSON(email Email, prompts []Prompt) string {
+	if len(prompts) == 0 {
+		return ""
+	}
+	b, err := json.Marshal(c.buildClassifyPayload(email, prompts))
+	if err != nil {
+		return "{}"
+	}
+	return string(b)
+}
+
+func (c *Client) ClassifyEmailBatch(ctx context.Context, store *db.Store, email Email, prompts []Prompt) (map[int64]bool, string, string, error) {
+	if len(prompts) == 0 {
+		return nil, "", "", nil
+	}
+
+	payload := c.buildClassifyPayload(email, prompts)
 
 	requestBytes, err := json.Marshal(payload)
 	if err != nil {

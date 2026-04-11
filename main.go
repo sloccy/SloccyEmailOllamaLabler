@@ -16,6 +16,7 @@ import (
 	"github.com/sloccy/ollamail/gmail"
 	"github.com/sloccy/ollamail/llm"
 	"github.com/sloccy/ollamail/poller"
+	"github.com/sloccy/ollamail/processor"
 )
 
 func main() {
@@ -38,13 +39,6 @@ func main() {
 
 	if err := store.Migrate(); err != nil {
 		log.Fatalf("migrate db: %v", err) //nolint:gocritic // OS reclaims file handle on Fatalf
-	}
-
-	// Backfill the Troubleshooting debug table from history so it has content
-	// on boot before the first scan runs. No LLM calls; gmail_raw/llm_request
-	// stay empty for backfilled rows.
-	if err := store.BackfillLlmDebugFromHistory(context.Background()); err != nil {
-		slog.Warn("llm debug backfill failed", "err", err)
 	}
 
 	// Seed default poll_interval setting
@@ -70,6 +64,14 @@ func main() {
 
 	// Gmail auth
 	gmailAuth := gmail.NewAuth(cfg.CredentialsFile)
+
+	// Seed the Troubleshooting debug table with the 3 most recent processed
+	// emails when the table is empty. Re-fetches gmail data and rebuilds the
+	// LLM request locally; no LLM call is made.
+	if err := processor.BackfillLlmDebug(context.Background(), store, ollamaClient, gmailAuth,
+		processor.ProcessConfig{BodyTruncation: cfg.EmailBodyTrunc}); err != nil {
+		slog.Warn("llm debug backfill failed", "err", err)
+	}
 
 	// Poller
 	p := poller.New(store, ollamaClient, gmailAuth, &poller.Config{

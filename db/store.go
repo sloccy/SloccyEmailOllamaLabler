@@ -564,57 +564,6 @@ func (s *Store) RecordLlmDebug(ctx context.Context, e LlmDebugEntry) error {
 	return s.TrimLlmDebug(ctx)
 }
 
-// BackfillLlmDebugFromHistory ensures the llm_debug table has up to 5 rows by
-// copying the most recent categorization_history entries whose message_ids are
-// not already represented. Used on boot so the Troubleshooting page has
-// something to show before a new scan runs. gmail_raw and llm_request are left
-// empty because history does not store them.
-func (s *Store) BackfillLlmDebugFromHistory(ctx context.Context) error {
-	existing, err := s.GetLatestLlmDebug(ctx)
-	if err != nil {
-		return err
-	}
-	if len(existing) >= 5 {
-		return nil
-	}
-	present := make(map[string]bool, len(existing))
-	for _, e := range existing {
-		present[e.MessageID] = true
-	}
-
-	history, err := s.GetHistory(ctx, 5)
-	if err != nil {
-		return err
-	}
-
-	// Insert oldest-first so the newest history row gets the highest llm_debug id.
-	count := len(existing)
-	for i := len(history) - 1; i >= 0; i-- {
-		if count >= 5 {
-			break
-		}
-		h := history[i]
-		if present[h.MessageID] {
-			continue
-		}
-		if err := s.AddLlmDebug(ctx, AddLlmDebugParams{
-			AccountID:    h.AccountID,
-			AccountEmail: h.AccountEmail,
-			MessageID:    h.MessageID,
-			Subject:      h.Subject,
-			Sender:       h.Sender,
-			GmailRaw:     "",
-			LlmRequest:   "",
-			LlmResponse:  h.LlmResponse,
-		}); err != nil {
-			return err
-		}
-		present[h.MessageID] = true
-		count++
-	}
-	return s.TrimLlmDebug(ctx)
-}
-
 // ============================================================
 // Trim helpers
 // ============================================================

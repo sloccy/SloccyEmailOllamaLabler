@@ -377,10 +377,10 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetLatestLlmDebug :many
 SELECT id, timestamp, account_id, account_email, message_id, subject, sender, gmail_raw, llm_request, llm_response
-FROM llm_debug ORDER BY id DESC LIMIT 5;
+FROM llm_debug ORDER BY id DESC LIMIT 3;
 
 -- name: TrimLlmDebug :exec
-DELETE FROM llm_debug WHERE id NOT IN (SELECT id FROM llm_debug ORDER BY id DESC LIMIT 5);
+DELETE FROM llm_debug WHERE id NOT IN (SELECT id FROM llm_debug ORDER BY id DESC LIMIT 3);
 
 -- ============================================================
 -- Schema version
