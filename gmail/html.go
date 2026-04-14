@@ -101,6 +101,8 @@ func cleanInvisibles(s string) string {
 			return -1
 		case r >= 0x2066 && r <= 0x2069: // bidi isolate controls
 			return -1
+		case r == 0xFFFD: // Unicode replacement character — signals decode error
+			return -1
 		default:
 			return r
 		}

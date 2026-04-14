@@ -414,6 +414,10 @@ func extractBodyRecursive(ctx context.Context, svc *Client, msgID string, part *
 	mimeType := strings.ToLower(part.MimeType)
 
 	if len(part.Parts) == 0 {
+		// Only process text/* parts — skip image/*, application/*, etc.
+		if !strings.HasPrefix(mimeType, "text/") {
+			return ""
+		}
 		// Leaf node — get the raw base64 data, fetching via attachment API if not inline
 		rawData := ""
 		if part.Body != nil {
@@ -442,6 +446,8 @@ func extractBodyRecursive(ctx context.Context, svc *Client, msgID string, part *
 		text := string(data)
 		if strings.Contains(mimeType, "html") {
 			text = extractText(text)
+		} else {
+			text = cleanInvisibles(text)
 		}
 		return Truncate(text, maxChars)
 	}
