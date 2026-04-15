@@ -452,16 +452,44 @@ func extractBodyRecursive(ctx context.Context, svc *Client, msgID string, part *
 		return Truncate(text, maxChars)
 	}
 
-	// Return the longest candidate across all child parts. Marketing emails
-	// often have a tiny text/plain stub while the real content is in text/html;
-	// preferring by length avoids returning a single-line preheader.
-	var best string
+	// Prefer html-processed output over plaintext. extractText already strips
+	// <style>/<script> blocks and all tags, so html-processed has a known lower
+	// bound on cleanliness. text/plain alternatives from broken senders (e.g.
+	// CSS dumps) have no equivalent sanitizer and can fill the LLM context with
+	// garbage. Fall back to the best plaintext only when html is absent or
+	// trivially short (< 40 chars), to handle degenerate html-only stubs.
+	const htmlFloor = 40
+	var htmlBest, plainBest string
 	for _, p := range part.Parts {
-		if t := extractBodyRecursive(ctx, svc, msgID, &p, maxChars); len(t) > len(best) {
-			best = t
+		t := extractBodyRecursive(ctx, svc, msgID, &p, maxChars)
+		if t == "" {
+			continue
+		}
+		childMime := strings.ToLower(p.MimeType)
+		switch {
+		case strings.Contains(childMime, "html"):
+			if len(t) > len(htmlBest) {
+				htmlBest = t
+			}
+		case strings.HasPrefix(childMime, "text/"):
+			if len(t) > len(plainBest) {
+				plainBest = t
+			}
+		default:
+			// Nested multipart — recursive result already applied this rule;
+			// treat as html so it beats a sibling plaintext stub.
+			if len(t) > len(htmlBest) {
+				htmlBest = t
+			}
 		}
 	}
-	return best
+	if len(htmlBest) >= htmlFloor {
+		return htmlBest
+	}
+	if plainBest != "" {
+		return plainBest
+	}
+	return htmlBest
 }
 
 // Modify represents a set of label changes to apply to messages.
