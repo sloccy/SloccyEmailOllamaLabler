@@ -56,7 +56,17 @@ func extractText(src string) string {
 			continue
 		}
 
-		if src[i] == '>' {
+		switch src[i] {
+		case '"', '\'':
+			// Skip to the matching close quote so a '>' inside an
+			// attribute value (e.g. alt="a > b") is not mistaken for
+			// the end of the tag.
+			q := src[i]
+			i++
+			for i < len(src) && src[i] != q {
+				i++
+			}
+		case '>':
 			inTag = false
 			sb.WriteByte('\n')
 		}

@@ -67,6 +67,21 @@ func TestExtractText(t *testing.T) {
 			"<p>a</p>\n\n<p>b</p>",
 			"a\nb",
 		},
+		{
+			"gt in double-quoted attribute not leaked",
+			`<img alt="a > b" src="x.png">after`,
+			"after",
+		},
+		{
+			"gt in single-quoted attribute not leaked",
+			`<div data-x='val>ue'>text</div>`,
+			"text",
+		},
+		{
+			"img with gt in alt between real content",
+			`<p class="x">before</p><img alt=">" border="0"><p>after</p>`,
+			"before\nafter",
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
