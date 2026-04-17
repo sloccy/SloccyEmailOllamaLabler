@@ -11,6 +11,8 @@
   <script src="/static/vendor/htmx.min.js" defer></script>
 </head>
 <body>
+<button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Menu">&#9776;</button>
+<div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeSidebar()"></div>
 <div class="layout">
   <aside class="sidebar">
     <div class="sidebar-logo border-bottom mb-3 pb-3">
@@ -295,7 +297,7 @@
           <thead>
             <tr>
               <th class="col-time">Time</th>
-              <th class="col-account">Account</th>
+              <th class="col-account d-none d-md-table-cell">Account</th>
               <th class="col-subject">Subject</th>
               <th class="col-sender">Sender</th>
               <th class="col-rule">Rule</th>

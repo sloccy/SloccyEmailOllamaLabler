@@ -215,3 +215,61 @@ h1,h2,h3,h4,h5,h6 { letter-spacing: -0.025em; }
   border-color: var(--om-primary-50);
   box-shadow: 0 0 0 2px var(--om-primary-08);
 }
+
+/* ===== Mobile responsive (< 768px) ===== */
+.sidebar-toggle {
+  display: none;
+  position: fixed; top: 12px; left: 12px; z-index: 1100;
+  width: 44px; height: 44px; border: none; border-radius: 8px;
+  background: var(--om-bg-200); color: var(--om-text); font-size: 18px;
+  cursor: pointer; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+.sidebar-backdrop {
+  display: none; position: fixed; inset: 0; z-index: 1049;
+  background: rgba(0,0,0,0.5);
+}
+.sidebar-backdrop.visible { display: block; }
+
+@media (max-width: 767.98px) {
+  /* Hamburger button */
+  .sidebar-toggle { display: flex; }
+
+  /* Sidebar: off-canvas */
+  .sidebar {
+    position: fixed; top: 0; left: -240px; height: 100dvh; z-index: 1050;
+    width: 220px; transition: left 0.22s ease; padding-top: 64px;
+  }
+  .sidebar.open { left: 0; }
+
+  /* Main: full width, shifted to make room for toggle button */
+  .main { width: 100%; }
+  .page { padding: 16px; padding-top: 64px; }
+
+  /* Page headers: stack title + action button */
+  .page > .d-flex.align-items-center.justify-content-between.mb-4 {
+    flex-direction: column; align-items: flex-start; gap: 0.5rem;
+  }
+
+  /* Stats: 2×2 grid on mobile */
+  .stat { flex: 1 1 calc(50% - 1px); min-width: 0; }
+  .stat:nth-child(2) { border-right: none; }
+  .stat:nth-child(-n+2) { border-bottom: 1px solid var(--om-text-10); }
+
+  /* Card button groups: allow wrapping */
+  .card-body .d-flex.gap-2.flex-shrink-0 { flex-wrap: wrap; }
+
+  /* Account/prompt cards: stack content and buttons vertically */
+  .card-body > .d-flex.align-items-start.justify-content-between {
+    flex-direction: column; gap: 0.75rem;
+  }
+  .card-body > .d-flex.align-items-start.justify-content-between > .d-flex.gap-2.flex-shrink-0 {
+    align-self: flex-start;
+  }
+
+  /* History table: tighter */
+  .history-table { min-width: 700px; }
+
+  /* Settings/builder/retention max-width: remove cap on mobile */
+  .page [style*="max-width"] { max-width: 100% !important; }
+}

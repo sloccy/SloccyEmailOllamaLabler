@@ -3,6 +3,20 @@ function togglePanel(id) {
   document.getElementById(id).classList.toggle('d-none');
 }
 
+// ---- Mobile sidebar ----
+function toggleSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  sidebar.classList.toggle('open');
+  backdrop.classList.toggle('visible');
+}
+function closeSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  if (sidebar) sidebar.classList.remove('open');
+  if (backdrop) backdrop.classList.remove('visible');
+}
+
 // ---- Sync account selects ----
 function syncAccountSelects() {
   const src = document.getElementById('prompt-filter-account');
@@ -27,6 +41,7 @@ function setActivePage(page, el) {
   document.getElementById('page-' + page).classList.add('active');
   if (el) el.classList.add('active');
   if (location.hash !== '#' + page) history.replaceState(null, '', '#' + page);
+  closeSidebar();
 }
 
 function _navToHash() {
