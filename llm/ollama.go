@@ -19,6 +19,17 @@ import (
 var fenceRe = regexp.MustCompile(`(?s)^` + "```" + `(?:json)?\s*|\s*` + "```" + `$`)
 var blankRunRe = regexp.MustCompile(`\n{3,}`)
 
+const (
+	jsonKeyModel       = "model"
+	jsonKeyStream      = "stream"
+	jsonKeyMessages    = "messages"
+	jsonKeyContent     = "content"
+	jsonKeyOptions     = "options"
+	jsonKeyTemperature = "temperature"
+	jsonKeyNumPredict  = "num_predict"
+	jsonKeyNumCtx      = "num_ctx"
+)
+
 type Client struct {
 	host       string
 	model      string
@@ -62,7 +73,7 @@ func (c *Client) EnsureModelPulled(store *db.Store) error {
 }
 
 func (c *Client) modelExists(ctx context.Context) (bool, error) {
-	body, err := json.Marshal(map[string]string{"model": c.model})
+	body, err := json.Marshal(map[string]string{jsonKeyModel: c.model})
 	if err != nil {
 		return false, err
 	}
@@ -77,7 +88,7 @@ func (c *Client) modelExists(ctx context.Context) (bool, error) {
 }
 
 func (c *Client) pullModel(ctx context.Context) error {
-	body, err := json.Marshal(map[string]any{"model": c.model, "stream": true})
+	body, err := json.Marshal(map[string]any{jsonKeyModel: c.model, jsonKeyStream: true})
 	if err != nil {
 		return err
 	}
@@ -123,17 +134,17 @@ func (c *Client) buildClassifyPayload(email Email, prompts []Prompt) map[string]
 		numPredict = n
 	}
 	return map[string]any{
-		"model": c.model,
-		"messages": []map[string]string{
-			{"role": "user", "content": body},
+		jsonKeyModel: c.model,
+		jsonKeyMessages: []map[string]string{
+			{"role": "user", jsonKeyContent: body},
 		},
-		"think":  false,
-		"format": "json",
-		"stream": false,
-		"options": map[string]any{
-			"temperature": 0,
-			"num_predict": numPredict,
-			"num_ctx":     c.numCtx,
+		"think":       false,
+		"format":      "json",
+		jsonKeyStream: false,
+		jsonKeyOptions: map[string]any{
+			jsonKeyTemperature: 0,
+			jsonKeyNumPredict:  numPredict,
+			jsonKeyNumCtx:      c.numCtx,
 		},
 	}
 }
@@ -278,15 +289,15 @@ func (c *Client) StreamGeneratePromptInstruction(ctx context.Context, descriptio
 
 func (c *Client) streamGenerate(ctx context.Context, description string, ch chan<- StreamChunk) error {
 	payload := map[string]any{
-		"model": c.model,
-		"messages": []map[string]string{
+		jsonKeyModel: c.model,
+		jsonKeyMessages: []map[string]string{
 			{
-				"role":    "system",
-				"content": "You write email filter rules for an AI classifier. Output only the rule text. No preamble, no drafts, no self-critique, no quotes, no explanation.",
+				"role":       "system",
+				jsonKeyContent: "You write email filter rules for an AI classifier. Output only the rule text. No preamble, no drafts, no self-critique, no quotes, no explanation.",
 			},
 			{
 				"role": "user",
-				"content": fmt.Sprintf(
+				jsonKeyContent: fmt.Sprintf(
 					"Write a 2-4 sentence classifier instruction for emails matching: %q\n\n"+
 						"The instruction must describe: what the email is about, its purpose/intent, "+
 						"and what distinguishes it from similar-but-non-matching emails. "+
@@ -295,11 +306,11 @@ func (c *Client) streamGenerate(ctx context.Context, description string, ch chan
 					description),
 			},
 		},
-		"stream": true,
-		"options": map[string]any{
-			"temperature": 0.7,
-			"num_predict": 2048,
-			"num_ctx":     c.numCtx,
+		jsonKeyStream: true,
+		jsonKeyOptions: map[string]any{
+			jsonKeyTemperature: 0.7,
+			jsonKeyNumPredict:  2048,
+			jsonKeyNumCtx:      c.numCtx,
 		},
 	}
 
@@ -389,16 +400,16 @@ Remember: output ONLY the rewritten instructions text. No other text whatsoever.
 // a misclassification example. It returns the revised text, the full conversation (for
 // subsequent iterations), and any error.
 func (c *Client) ImprovePromptInstructions(ctx context.Context, req ImproveRequest) (string, []ChatMessage, error) {
-	messages := []map[string]string{{"role": "system", "content": improveSystemPrompt}}
+	messages := []map[string]string{{"role": "system", jsonKeyContent: improveSystemPrompt}}
 
 	if len(req.PriorConversation) > 0 {
 		for _, m := range req.PriorConversation {
-			messages = append(messages, map[string]string{"role": m.Role, "content": m.Content})
+			messages = append(messages, map[string]string{"role": m.Role, jsonKeyContent: m.Content})
 		}
 		// Append latest user comment
 		messages = append(messages, map[string]string{
-			"role":    "user",
-			"content": req.UserComment,
+			"role":       "user",
+			jsonKeyContent: req.UserComment,
 		})
 	} else {
 		userMsg := fmt.Sprintf(
@@ -407,17 +418,17 @@ func (c *Client) ImprovePromptInstructions(ctx context.Context, req ImproveReque
 			req.OriginalInstructions,
 			req.EmailSender, req.EmailSubject, req.EmailBody,
 		)
-		messages = append(messages, map[string]string{"role": "user", "content": userMsg})
+		messages = append(messages, map[string]string{"role": "user", jsonKeyContent: userMsg})
 	}
 
 	payload := map[string]any{
-		"model":    c.model,
-		"messages": messages,
-		"stream":   false,
-		"options": map[string]any{
-			"temperature": 0.4,
-			"num_predict": 16384,
-			"num_ctx":     c.numCtx,
+		jsonKeyModel:    c.model,
+		jsonKeyMessages: messages,
+		jsonKeyStream:   false,
+		jsonKeyOptions: map[string]any{
+			jsonKeyTemperature: 0.4,
+			jsonKeyNumPredict:  16384,
+			jsonKeyNumCtx:      c.numCtx,
 		},
 	}
 

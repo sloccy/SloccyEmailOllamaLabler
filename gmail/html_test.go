@@ -3,22 +3,23 @@ package gmail
 import "testing"
 
 func TestCleanInvisibles(t *testing.T) {
+	const wantFoobar = "foobar"
 	tests := []struct {
 		name  string
 		input string
 		want  string
 	}{
 		{"clean text unchanged", "Hello, world!", "Hello, world!"},
-		{"null byte stripped", "foo\x00bar", "foobar"},
+		{"null byte stripped", "foo\x00bar", wantFoobar},
 		{"C0 controls stripped", "a\x01\x02\x03b", "ab"},
 		{"newline preserved", "line1\nline2", "line1\nline2"},
 		{"tab preserved", "col1\tcol2", "col1\tcol2"},
-		{"zero-width space stripped", "foo\u200bbar", "foobar"},
+		{"zero-width space stripped", "foo\u200bbar", wantFoobar},
 		{"BOM stripped", "\uFEFFhello", "hello"},
 		{"soft hyphen stripped", "hyp\u00adhen", "hyphen"},
 		{"bidi override stripped", "a\u202eb", "ab"},
 		{"valid UTF-8 preserved", "café naïve 日本語 🎉", "café naïve 日本語 🎉"},
-		{"replacement char stripped", "foo\uFFFDbar", "foobar"},
+		{"replacement char stripped", "foo\uFFFDbar", wantFoobar},
 		{"empty string", "", ""},
 	}
 	for _, tc := range tests {

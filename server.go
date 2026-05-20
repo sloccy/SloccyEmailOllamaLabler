@@ -35,6 +35,15 @@ var staticFS embed.FS
 
 const retentionUnitYears = "years"
 
+const (
+	triggerShowToast              = "showToast"
+	triggerRefreshSuggestionBadge = "refreshSuggestionBadge"
+	toastKeyMessage               = "message"
+	tmplKeyPollInterval           = "PollInterval"
+	encodingGzip                  = "gzip"
+	headerAcceptEncoding          = "Accept-Encoding"
+)
+
 // server holds all dependencies and the route mux.
 type server struct {
 	ctx       context.Context
@@ -89,9 +98,9 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.mux.ServeHTTP(w, r)
 		return
 	}
-	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-		w.Header().Set("Content-Encoding", "gzip")
-		w.Header().Set("Vary", "Accept-Encoding")
+	if strings.Contains(r.Header.Get(headerAcceptEncoding), encodingGzip) {
+		w.Header().Set("Content-Encoding", encodingGzip)
+		w.Header().Set("Vary", headerAcceptEncoding)
 		gz := gzipPool.Get().(*gzip.Writer) //nolint:forcetypeassert // pool only contains *gzip.Writer
 		gz.Reset(w)
 		defer func() {
@@ -128,7 +137,7 @@ func (s *server) registerRoutes() {
 	s.mux.HandleFunc("GET /static/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "public, max-age=86400")
 		relPath := strings.TrimPrefix(r.URL.Path, "/static/")
-		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+		if strings.Contains(r.Header.Get(headerAcceptEncoding), encodingGzip) {
 			if f, err := staticSub.Open(relPath + ".gz"); err == nil {
 				defer func() { _ = f.Close() }()
 				ct := mime.TypeByExtension(path.Ext(relPath))
@@ -136,8 +145,8 @@ func (s *server) registerRoutes() {
 					ct = "application/octet-stream"
 				}
 				w.Header().Set("Content-Type", ct)
-				w.Header().Set("Content-Encoding", "gzip")
-				w.Header().Set("Vary", "Accept-Encoding")
+				w.Header().Set("Content-Encoding", encodingGzip)
+				w.Header().Set("Vary", headerAcceptEncoding)
 				_, _ = io.Copy(w, f)
 				return
 			}
@@ -224,7 +233,7 @@ func (s *server) renderFragmentFile(w http.ResponseWriter, path string, data any
 
 func (s *server) fragmentResponse(w http.ResponseWriter, path string, data any, toast string) {
 	if toast != "" {
-		triggers := map[string]any{"showToast": toast}
+		triggers := map[string]any{triggerShowToast: toast}
 		if b, err := json.Marshal(triggers); err == nil {
 			w.Header().Set("Hx-Trigger", string(b))
 		}
@@ -266,7 +275,7 @@ func (s *server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"PollerRunning": status.Running,
 		"AccountCount":  len(accounts),
 		"ActivePrompts": activePrompts,
-		"PollInterval":  fmtinterval(pollSecs),
+		tmplKeyPollInterval:  fmtinterval(pollSecs),
 		"NextScan":      nextScan,
 		"Logs":          logs,
 	}
@@ -558,7 +567,7 @@ func (s *server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	pollInterval, _ := s.store.GetSetting(ctx, "poll_interval")
 	pi, _ := strconv.Atoi(pollInterval)
 	data := map[string]any{
-		"PollInterval": pi,
+		tmplKeyPollInterval: pi,
 		"OllamaModel":  s.cfg.OllamaModel,
 		"OllamaHost":   s.cfg.OllamaHost,
 	}
@@ -577,7 +586,7 @@ func (s *server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	s.poller.UpdateInterval(n)
 
 	data := map[string]any{
-		"PollInterval": n,
+		tmplKeyPollInterval: n,
 		"OllamaModel":  s.cfg.OllamaModel,
 		"OllamaHost":   s.cfg.OllamaHost,
 	}
@@ -955,7 +964,7 @@ func (s *server) handleScan(w http.ResponseWriter, _ *http.Request) {
 	s.store.Log("INFO", "Manual scan triggered")
 	s.poller.RunNow()
 	setHxTrigger(w, map[string]any{
-		"showToast":        map[string]any{"message": "Scan complete", "type": "success"},
+		triggerShowToast:        map[string]any{toastKeyMessage: "Scan complete", "type": "success"},
 		"refreshDashboard": "",
 	})
 	w.WriteHeader(http.StatusOK)
@@ -1502,9 +1511,9 @@ func (s *server) handleRecategorize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	setHxTrigger(w, map[string]any{
-		"showToast":              map[string]any{"message": "Recategorization applied", "type": "success"},
+		triggerShowToast:              map[string]any{toastKeyMessage: "Recategorization applied", "type": "success"},
 		"closeModal":             "recategorize-modal",
-		"refreshSuggestionBadge": "1",
+		triggerRefreshSuggestionBadge: "1",
 		"refreshHistory":         "1",
 		"refreshSuggestions":     "1",
 	})
@@ -1743,7 +1752,7 @@ func (s *server) handlePromptSuggestionApply(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "apply failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	setHxTrigger(w, map[string]any{"refreshSuggestionBadge": "1"})
+	setHxTrigger(w, map[string]any{triggerRefreshSuggestionBadge: "1"})
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -1755,7 +1764,7 @@ func (s *server) handlePromptSuggestionDismiss(w http.ResponseWriter, r *http.Re
 	}
 	ctx := r.Context()
 	_ = s.store.DismissPromptSuggestion(ctx, id)
-	setHxTrigger(w, map[string]any{"refreshSuggestionBadge": "1"})
+	setHxTrigger(w, map[string]any{triggerRefreshSuggestionBadge: "1"})
 	w.WriteHeader(http.StatusOK)
 }
 
