@@ -40,6 +40,7 @@ const (
 	triggerRefreshSuggestionBadge = "refreshSuggestionBadge"
 	toastKeyMessage               = "message"
 	tmplKeyPollInterval           = "PollInterval"
+	jsonKeyType                   = "type"
 	encodingGzip                  = "gzip"
 	headerAcceptEncoding          = "Accept-Encoding"
 )
@@ -272,12 +273,12 @@ func (s *server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := map[string]any{
-		"PollerRunning": status.Running,
-		"AccountCount":  len(accounts),
-		"ActivePrompts": activePrompts,
-		tmplKeyPollInterval:  fmtinterval(pollSecs),
-		"NextScan":      nextScan,
-		"Logs":          logs,
+		"PollerRunning":     status.Running,
+		"AccountCount":      len(accounts),
+		"ActivePrompts":     activePrompts,
+		tmplKeyPollInterval: fmtinterval(pollSecs),
+		"NextScan":          nextScan,
+		"Logs":              logs,
 	}
 	s.fragmentResponse(w, "templates/fragments/dashboard.html", data, "")
 }
@@ -568,8 +569,8 @@ func (s *server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	pi, _ := strconv.Atoi(pollInterval)
 	data := map[string]any{
 		tmplKeyPollInterval: pi,
-		"OllamaModel":  s.cfg.OllamaModel,
-		"OllamaHost":   s.cfg.OllamaHost,
+		"OllamaModel":       s.cfg.OllamaModel,
+		"OllamaHost":        s.cfg.OllamaHost,
 	}
 	s.fragmentResponse(w, "templates/fragments/settings_form.html", data, "")
 }
@@ -587,8 +588,8 @@ func (s *server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 
 	data := map[string]any{
 		tmplKeyPollInterval: n,
-		"OllamaModel":  s.cfg.OllamaModel,
-		"OllamaHost":   s.cfg.OllamaHost,
+		"OllamaModel":       s.cfg.OllamaModel,
+		"OllamaHost":        s.cfg.OllamaHost,
 	}
 	s.fragmentResponse(w, "templates/fragments/settings_form.html", data, "Settings saved")
 }
@@ -964,7 +965,7 @@ func (s *server) handleScan(w http.ResponseWriter, _ *http.Request) {
 	s.store.Log("INFO", "Manual scan triggered")
 	s.poller.RunNow()
 	setHxTrigger(w, map[string]any{
-		triggerShowToast:        map[string]any{toastKeyMessage: "Scan complete", "type": "success"},
+		triggerShowToast:   map[string]any{toastKeyMessage: "Scan complete", jsonKeyType: "success"},
 		"refreshDashboard": "",
 	})
 	w.WriteHeader(http.StatusOK)
@@ -1174,7 +1175,7 @@ func (s *server) handleGenerateStream(w http.ResponseWriter, r *http.Request) {
 		if chunk.Err != nil {
 			break
 		}
-		b, _ := json.Marshal(map[string]string{"type": "content", "text": chunk.Text}) //nolint:errchkjson // map[string]string cannot fail
+		b, _ := json.Marshal(map[string]string{jsonKeyType: "content", "text": chunk.Text}) //nolint:errchkjson // map[string]string cannot fail
 		_, _ = fmt.Fprintf(w, "data: %s\n\n", b)
 		flusher.Flush()
 	}
@@ -1511,11 +1512,11 @@ func (s *server) handleRecategorize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	setHxTrigger(w, map[string]any{
-		triggerShowToast:              map[string]any{toastKeyMessage: "Recategorization applied", "type": "success"},
-		"closeModal":             "recategorize-modal",
+		triggerShowToast:              map[string]any{toastKeyMessage: "Recategorization applied", jsonKeyType: "success"},
+		"closeModal":                  "recategorize-modal",
 		triggerRefreshSuggestionBadge: "1",
-		"refreshHistory":         "1",
-		"refreshSuggestions":     "1",
+		"refreshHistory":              "1",
+		"refreshSuggestions":          "1",
 	})
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 }

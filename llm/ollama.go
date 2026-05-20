@@ -21,6 +21,7 @@ var blankRunRe = regexp.MustCompile(`\n{3,}`)
 
 const (
 	jsonKeyModel       = "model"
+	jsonKeyRole        = "role"
 	jsonKeyStream      = "stream"
 	jsonKeyMessages    = "messages"
 	jsonKeyContent     = "content"
@@ -136,7 +137,7 @@ func (c *Client) buildClassifyPayload(email Email, prompts []Prompt) map[string]
 	return map[string]any{
 		jsonKeyModel: c.model,
 		jsonKeyMessages: []map[string]string{
-			{"role": "user", jsonKeyContent: body},
+			{jsonKeyRole: "user", jsonKeyContent: body},
 		},
 		"think":       false,
 		"format":      "json",
@@ -292,11 +293,11 @@ func (c *Client) streamGenerate(ctx context.Context, description string, ch chan
 		jsonKeyModel: c.model,
 		jsonKeyMessages: []map[string]string{
 			{
-				"role":       "system",
+				jsonKeyRole:    "system",
 				jsonKeyContent: "You write email filter rules for an AI classifier. Output only the rule text. No preamble, no drafts, no self-critique, no quotes, no explanation.",
 			},
 			{
-				"role": "user",
+				jsonKeyRole: "user",
 				jsonKeyContent: fmt.Sprintf(
 					"Write a 2-4 sentence classifier instruction for emails matching: %q\n\n"+
 						"The instruction must describe: what the email is about, its purpose/intent, "+
@@ -400,15 +401,15 @@ Remember: output ONLY the rewritten instructions text. No other text whatsoever.
 // a misclassification example. It returns the revised text, the full conversation (for
 // subsequent iterations), and any error.
 func (c *Client) ImprovePromptInstructions(ctx context.Context, req ImproveRequest) (string, []ChatMessage, error) {
-	messages := []map[string]string{{"role": "system", jsonKeyContent: improveSystemPrompt}}
+	messages := []map[string]string{{jsonKeyRole: "system", jsonKeyContent: improveSystemPrompt}}
 
 	if len(req.PriorConversation) > 0 {
 		for _, m := range req.PriorConversation {
-			messages = append(messages, map[string]string{"role": m.Role, jsonKeyContent: m.Content})
+			messages = append(messages, map[string]string{jsonKeyRole: m.Role, jsonKeyContent: m.Content})
 		}
 		// Append latest user comment
 		messages = append(messages, map[string]string{
-			"role":       "user",
+			jsonKeyRole:    "user",
 			jsonKeyContent: req.UserComment,
 		})
 	} else {
@@ -418,7 +419,7 @@ func (c *Client) ImprovePromptInstructions(ctx context.Context, req ImproveReque
 			req.OriginalInstructions,
 			req.EmailSender, req.EmailSubject, req.EmailBody,
 		)
-		messages = append(messages, map[string]string{"role": "user", jsonKeyContent: userMsg})
+		messages = append(messages, map[string]string{jsonKeyRole: "user", jsonKeyContent: userMsg})
 	}
 
 	payload := map[string]any{

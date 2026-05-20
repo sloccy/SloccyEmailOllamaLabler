@@ -87,7 +87,6 @@ func BackfillLlmDebug(ctx context.Context, store *db.Store, ollamaClient *llm.Cl
 
 	// Insert oldest-first (history is id DESC) so the newest row gets the highest llm_debug id.
 	for _, h := range slices.Backward(history) {
-
 		entry, ok := svcCache[h.AccountID]
 		if !ok {
 			continue
