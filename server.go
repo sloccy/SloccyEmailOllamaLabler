@@ -14,8 +14,10 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"mime"
 	"net/http"
 	"net/url"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -83,6 +85,10 @@ var gzipPool = sync.Pool{
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+	if strings.HasPrefix(r.URL.Path, "/static/") {
+		s.mux.ServeHTTP(w, r)
+		return
+	}
 	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 		w.Header().Set("Content-Encoding", "gzip")
 		w.Header().Set("Vary", "Accept-Encoding")
@@ -121,6 +127,21 @@ func (s *server) registerRoutes() {
 	fileServer := http.StripPrefix("/static/", http.FileServer(http.FS(staticSub)))
 	s.mux.HandleFunc("GET /static/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "public, max-age=86400")
+		relPath := strings.TrimPrefix(r.URL.Path, "/static/")
+		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			if f, err := staticSub.Open(relPath + ".gz"); err == nil {
+				defer func() { _ = f.Close() }()
+				ct := mime.TypeByExtension(path.Ext(relPath))
+				if ct == "" {
+					ct = "application/octet-stream"
+				}
+				w.Header().Set("Content-Type", ct)
+				w.Header().Set("Content-Encoding", "gzip")
+				w.Header().Set("Vary", "Accept-Encoding")
+				_, _ = io.Copy(w, f)
+				return
+			}
+		}
 		fileServer.ServeHTTP(w, r)
 	})
 
